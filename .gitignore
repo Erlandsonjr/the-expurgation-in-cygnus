@@ -1,0 +1,39 @@
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]serSettings/
+
+# Unity-generated IDE files
+*.csproj
+*.sln
+*.slnx
+*.unityproj
+*.pidb
+*.suo
+*.user
+*.userprefs
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# IDE and local tooling
+.vs/
+.vscode/
+.idea/
+.consulo/
+.gradle/
+.venv/
+
+# Unity cache and recordings
+MemoryCaptures/
+Recordings/
+ExportedObj/
+
+# Asset Store tools
+Assets/AssetStoreTools*
