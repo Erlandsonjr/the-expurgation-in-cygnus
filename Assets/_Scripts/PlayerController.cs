@@ -69,7 +69,7 @@ public sealed class PlayerController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        isGrounded = rigidbody2d.velocity.y > 0.01f ? false : CheckGrounded();
+        isGrounded = rigidbody2d.linearVelocity.y > 0.01f ? false : CheckGrounded();
         coyoteCounter = isGrounded ? coyoteTime : Mathf.Max(0f, coyoteCounter - Time.fixedDeltaTime);
 
         ApplyHorizontalMovement();
@@ -81,9 +81,9 @@ public sealed class PlayerController : MonoBehaviour
     {
         float targetSpeed = moveInput * moveSpeed;
         float speedDelta = Mathf.Abs(targetSpeed) > 0.01f ? acceleration : deceleration;
-        float nextVelocityX = Mathf.MoveTowards(rigidbody2d.velocity.x, targetSpeed, speedDelta * Time.fixedDeltaTime);
+        float nextVelocityX = Mathf.MoveTowards(rigidbody2d.linearVelocity.x, targetSpeed, speedDelta * Time.fixedDeltaTime);
 
-        rigidbody2d.velocity = new Vector2(nextVelocityX, rigidbody2d.velocity.y);
+        rigidbody2d.linearVelocity = new Vector2(nextVelocityX, rigidbody2d.linearVelocity.y);
     }
 
     private void TryConsumeJump()
@@ -93,9 +93,9 @@ public sealed class PlayerController : MonoBehaviour
             return;
         }
 
-        Vector2 nextVelocity = rigidbody2d.velocity;
+        Vector2 nextVelocity = rigidbody2d.linearVelocity;
         nextVelocity.y = jumpForce;
-        rigidbody2d.velocity = nextVelocity;
+        rigidbody2d.linearVelocity = nextVelocity;
 
         coyoteCounter = 0f;
         jumpBufferCounter = 0f;
@@ -104,13 +104,13 @@ public sealed class PlayerController : MonoBehaviour
 
     private void ApplyVariableGravity()
     {
-        if (rigidbody2d.velocity.y < 0f)
+        if (rigidbody2d.linearVelocity.y < 0f)
         {
             rigidbody2d.gravityScale = baseGravityScale * fallGravityMultiplier;
             return;
         }
 
-        if (rigidbody2d.velocity.y > 0f && !jumpHeld)
+        if (rigidbody2d.linearVelocity.y > 0f && !jumpHeld)
         {
             rigidbody2d.gravityScale = baseGravityScale * lowJumpGravityMultiplier;
             return;
