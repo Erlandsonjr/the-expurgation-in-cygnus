@@ -29,6 +29,7 @@
 .consulo/
 .gradle/
 .venv/
+.vsconfig
 
 # Unity cache and recordings
 MemoryCaptures/
