@@ -10,6 +10,8 @@ public sealed class ProjectilePooler : MonoBehaviour
     [SerializeField] private Transform poolRoot;
 
     private readonly Queue<GameObject> availableProjectiles = new();
+    private readonly HashSet<GameObject> queuedProjectiles = new();
+    private int totalProjectilesCreated;
 
     private void Awake()
     {
@@ -28,14 +30,14 @@ public sealed class ProjectilePooler : MonoBehaviour
             return;
         }
 
-        int projectilesToCreate = Mathf.Max(0, count - availableProjectiles.Count);
+        int projectilesToCreate = Mathf.Max(0, count - totalProjectilesCreated);
         for (int index = 0; index < projectilesToCreate; index++)
         {
             CreateProjectile();
         }
     }
 
-    public GameObject GetProjectile(Vector2 position, Quaternion rotation)
+    public GameObject GetProjectile(Vector3 position, Quaternion rotation)
     {
         if (availableProjectiles.Count == 0)
         {
@@ -48,6 +50,8 @@ public sealed class ProjectilePooler : MonoBehaviour
         }
 
         GameObject projectile = availableProjectiles.Dequeue();
+        queuedProjectiles.Remove(projectile);
+        projectile.transform.SetParent(null);
         projectile.transform.SetPositionAndRotation(position, rotation);
         projectile.SetActive(true);
         return projectile;
@@ -55,12 +59,16 @@ public sealed class ProjectilePooler : MonoBehaviour
 
     public void ReturnProjectile(GameObject projectile)
     {
-        if (projectile == null)
+        if (projectile == null || !queuedProjectiles.Add(projectile))
         {
             return;
         }
 
-        projectile.SetActive(false);
+        if (projectile.activeSelf)
+        {
+            projectile.SetActive(false);
+        }
+
         projectile.transform.SetParent(poolRoot);
         availableProjectiles.Enqueue(projectile);
     }
@@ -68,8 +76,14 @@ public sealed class ProjectilePooler : MonoBehaviour
     private GameObject CreateProjectile()
     {
         GameObject projectile = Instantiate(projectilePrefab, poolRoot);
-        projectile.SetActive(false);
-        availableProjectiles.Enqueue(projectile);
+
+        if (projectile.TryGetComponent(out Projectile projectileComponent))
+        {
+            projectileComponent.AssignPool(this);
+        }
+
+        totalProjectilesCreated++;
+        ReturnProjectile(projectile);
         return projectile;
     }
 

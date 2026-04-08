@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(BoxCollider2D))]
@@ -23,7 +24,12 @@ public sealed class PlayerController : MonoBehaviour
     [SerializeField] private float groundCheckDistance = 0.08f;
 
     [Header("Aim")]
-    [SerializeField] private Transform pivot;
+    [FormerlySerializedAs("pivot")]
+    [SerializeField] private Transform aimPivot;
+
+    [Header("Combat")]
+    [SerializeField] private WeaponData activeWeapon;
+    [SerializeField] private ProjectilePooler projectilePooler;
 
     private BoxCollider2D boxCollider;
     private Camera mainCamera;
@@ -32,6 +38,7 @@ public sealed class PlayerController : MonoBehaviour
     private float coyoteCounter;
     private float jumpBufferCounter;
     private float moveInput;
+    private float shotCooldownTimer;
     private bool isGrounded;
     private bool jumpHeld;
 
@@ -47,7 +54,7 @@ public sealed class PlayerController : MonoBehaviour
         }
 
         rigidbody2d.gravityScale = baseGravityScale;
-        pivot ??= transform.Find("Pivot");
+        aimPivot ??= transform.Find("Pivot");
     }
 
     private void Update()
@@ -64,7 +71,9 @@ public sealed class PlayerController : MonoBehaviour
             jumpBufferCounter = Mathf.Max(0f, jumpBufferCounter - Time.deltaTime);
         }
 
+        shotCooldownTimer = Mathf.Max(0f, shotCooldownTimer - Time.deltaTime);
         UpdateAim();
+        HandlePrimaryFire();
     }
 
     private void FixedUpdate()
@@ -121,7 +130,7 @@ public sealed class PlayerController : MonoBehaviour
 
     private void UpdateAim()
     {
-        if (pivot == null || Mouse.current == null)
+        if (aimPivot == null || Mouse.current == null)
         {
             return;
         }
@@ -137,10 +146,10 @@ public sealed class PlayerController : MonoBehaviour
         }
 
         Vector3 mouseScreenPosition = Mouse.current.position.ReadValue();
-        mouseScreenPosition.z = Mathf.Abs(mainCamera.transform.position.z - pivot.position.z);
+        mouseScreenPosition.z = Mathf.Abs(mainCamera.transform.position.z - aimPivot.position.z);
 
         Vector3 mouseWorldPosition = mainCamera.ScreenToWorldPoint(mouseScreenPosition);
-        Vector2 aimDirection = mouseWorldPosition - pivot.position;
+        Vector2 aimDirection = mouseWorldPosition - aimPivot.position;
 
         if (aimDirection.sqrMagnitude <= 0.0001f)
         {
@@ -148,7 +157,53 @@ public sealed class PlayerController : MonoBehaviour
         }
 
         float aimAngle = Mathf.Atan2(aimDirection.y, aimDirection.x) * Mathf.Rad2Deg;
-        pivot.rotation = Quaternion.Euler(0f, 0f, aimAngle);
+        aimPivot.rotation = Quaternion.Euler(0f, 0f, aimAngle);
+    }
+
+    private void HandlePrimaryFire()
+    {
+        if (!IsPrimaryFireHeld())
+        {
+            return;
+        }
+
+        TryFireProjectile();
+    }
+
+    private void TryFireProjectile()
+    {
+        if (activeWeapon == null || projectilePooler == null || aimPivot == null || shotCooldownTimer > 0f)
+        {
+            return;
+        }
+
+        GameObject projectileObject = projectilePooler.GetProjectile(aimPivot.position, aimPivot.rotation);
+        if (projectileObject == null)
+        {
+            return;
+        }
+
+        Vector3 spawnPosition = aimPivot.position;
+        Quaternion spawnRotation = aimPivot.rotation;
+
+        projectileObject.transform.SetPositionAndRotation(spawnPosition, spawnRotation);
+
+        if (projectileObject.TryGetComponent(out Rigidbody2D projectileRigidbody))
+        {
+            projectileRigidbody.linearVelocity = Vector2.zero;
+            projectileRigidbody.angularVelocity = 0f;
+            projectileRigidbody.position = spawnPosition;
+            projectileRigidbody.rotation = spawnRotation.eulerAngles.z;
+        }
+
+        if (!projectileObject.TryGetComponent(out Projectile projectile))
+        {
+            projectilePooler.ReturnProjectile(projectileObject);
+            return;
+        }
+
+        projectile.Setup(activeWeapon.ProjectileSpeed);
+        shotCooldownTimer = activeWeapon.ShotInterval;
     }
 
     private bool CheckGrounded()
@@ -193,6 +248,12 @@ public sealed class PlayerController : MonoBehaviour
     {
         Keyboard keyboard = Keyboard.current;
         return keyboard != null && keyboard.spaceKey.wasPressedThisFrame;
+    }
+
+    private static bool IsPrimaryFireHeld()
+    {
+        Mouse mouse = Mouse.current;
+        return mouse != null && mouse.leftButton.isPressed;
     }
 
     private void OnValidate()
