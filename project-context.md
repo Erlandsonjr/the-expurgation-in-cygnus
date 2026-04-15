@@ -6,7 +6,7 @@ Week 3 - AI & Level 1 Management
 
 ## Active Task
 
-Tuning the combat feel before full Week 3 AI & Level 1 Management implementation.
+Implementing the Week 3 foundation: Arkano Scout enemy behavior and the first wave-spawning system.
 
 ## Roadmap Alignment
 
@@ -31,6 +31,7 @@ With Week 2 finalized, the project can now move into enemy behavior and encounte
 - Finalizing continuous primary fire from the verified 360-degree aim pivot.
 - Making projectile Object Pooling operational for runtime reuse.
 - Activating the ScriptableObject architecture for weapon attributes through WeaponData and the BaseWeapon asset.
+- Refining projectile collisions to use Ground LayerMasks and resetting pooled projectile state at spawn time.
 
 ## Progress Update
 
@@ -45,6 +46,9 @@ With Week 2 finalized, the project can now move into enemy behavior and encounte
 - The Week 2 combat scripts are ready for in-editor verification and the next commit pass.
 - Combat feel tuning is now in progress, with projectile spawn cleanup and architectural consistency refinements.
 - Projectile collisions now rely on Ground LayerMasks instead of Ground tags for consistency with the player motor ground-check approach.
+- Week 3 has started with the Arkano Scout AI state machine and the WaveManager spawn foundation.
+- The WaveManager foundation is now correctly serialized for inspector-driven enemy prefab, spawn interval, and spawn-point assignment.
+- New Week 3 scripts are ready to be staged for the next commit.
 
 ## Week 2 Implemented Architecture
 
@@ -68,8 +72,10 @@ With Week 2 finalized, the project can now move into enemy behavior and encounte
 
 Weeks 1 and 2 are complete. The project is now positioned for Week 3 work around simple tracking IAs and Level 1 management.
 
-A short combat-feel tuning pass is underway to tighten projectile behavior before enemy AI implementation begins.
+The project is now in early Week 3 implementation, with enemy behavior and spawn orchestration becoming the active development focus.
+
+The WaveManager is now ready for direct scene assignment through authored spawn points.
 
 ## Next Goal
 
-Week 3 - AI & Level 1 Management: simple tracking IAs.
+Week 3 - expand enemy behaviors, stabilize wave spawning, and connect the first Level 1 encounter loop.

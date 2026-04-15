@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: BaseWeapon
   m_EditorClassIdentifier: Assembly-CSharp::WeaponData
   damage: 10
-  fireRate: 0.2
+  fireRate: 2
   projectileSpeed: 15
