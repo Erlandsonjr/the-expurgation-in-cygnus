@@ -60,6 +60,7 @@ With Week 2 finalized, the project can now move into enemy behavior and encounte
 - Player movement is now temporarily disabled during knockback so the impulse window can resolve under physics before normal locomotion control resumes.
 - The game now has a functional health HUD path: `PlayerController` exposes health state and broadcasts updates, and `HealthBarUI` can drive a Unity UI Slider for live health monitoring.
 - Knockback is now 360-degree compliant and physics-resetting: the Purger clears existing velocity before the impulse, is pushed directly away from the attacker, and starts iFrame flicker at the impact moment.
+- Fail State (Death/Restart) is now fully implemented: lethal player damage enters a death state, shows the Game Over screen, freezes gameplay, and allows the active scene to be restarted from UI.
 
 ## Week 2 Implemented Architecture
 

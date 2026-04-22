@@ -9,6 +9,7 @@ using UnityEngine.Serialization;
 public sealed class PlayerController : MonoBehaviour, IDamageable
 {
     private static readonly int SpeedParameterHash = Animator.StringToHash("Speed");
+    private static readonly int DeathParameterHash = Animator.StringToHash("Death");
     private const float InvincibilityFlickerInterval = 0.08f;
 
     [Header("Movement")]
@@ -46,6 +47,9 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     [SerializeField] private WeaponData activeWeapon;
     [SerializeField] private ProjectilePooler projectilePooler;
 
+    [Header("UI")]
+    [SerializeField] private GameOverManager gameOverManager;
+
     private BoxCollider2D boxCollider;
     private Color bodyDefaultColor = Color.white;
     private Camera mainCamera;
@@ -58,6 +62,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     private float jumpBufferCounter;
     private float shotCooldownTimer;
     private bool isInvincible;
+    private bool isDead;
     private Vector2 moveInput;
     private bool isGrounded;
     private bool jumpHeld;
@@ -91,12 +96,14 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
         bodyAnimator ??= GetComponentInChildren<Animator>();
         bodySpriteRenderer ??= GetComponentInChildren<SpriteRenderer>();
+        gameOverManager ??= FindAnyObjectByType<GameOverManager>();
 
         maxHealth = maxHealth > 0f ? maxHealth : 5f;
         invincibilityDuration = Mathf.Max(0f, invincibilityDuration);
         knockbackForce = Mathf.Max(0f, knockbackForce);
         currentHealth = maxHealth;
         isInvincible = false;
+        isDead = false;
 
         if (bodySpriteRenderer != null)
         {
@@ -108,6 +115,11 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
     private void Update()
     {
+        if (isDead)
+        {
+            return;
+        }
+
         if (knockbackCounter > 0f)
         {
             knockbackCounter = Mathf.Max(0f, knockbackCounter - Time.deltaTime);
@@ -137,6 +149,13 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
     private void FixedUpdate()
     {
+        if (isDead)
+        {
+            rigidbody2d.linearVelocity = Vector2.zero;
+            rigidbody2d.gravityScale = baseGravityScale;
+            return;
+        }
+
         isGrounded = rigidbody2d.linearVelocity.y > 0.01f ? false : CheckGrounded();
         coyoteCounter = isGrounded ? coyoteTime : Mathf.Max(0f, coyoteCounter - Time.fixedDeltaTime);
 
@@ -291,15 +310,21 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
     public void TakeDamage(float damage, Vector2 sourcePosition)
     {
-        if (damage <= 0f || isInvincible)
+        if (damage <= 0f || isInvincible || isDead)
         {
             return;
         }
 
         currentHealth = Mathf.Max(0f, currentHealth - damage);
-        knockbackCounter = knockbackTotalTime;
         NotifyHealthChanged();
 
+        if (currentHealth <= 0f)
+        {
+            Die();
+            return;
+        }
+
+        knockbackCounter = knockbackTotalTime;
         StartInvincibilityFrames();
         ApplyKnockback(sourcePosition);
     }
@@ -373,6 +398,73 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     private void NotifyHealthChanged()
     {
         HealthChanged?.Invoke(currentHealth, maxHealth);
+    }
+
+    private void Die()
+    {
+        if (isDead)
+        {
+            return;
+        }
+
+        isDead = true;
+        currentHealth = 0f;
+        moveInput = Vector2.zero;
+        jumpHeld = false;
+        jumpBufferCounter = 0f;
+        coyoteCounter = 0f;
+        shotCooldownTimer = 0f;
+        knockbackCounter = 0f;
+
+        if (invincibilityRoutine != null)
+        {
+            StopCoroutine(invincibilityRoutine);
+            invincibilityRoutine = null;
+        }
+
+        isInvincible = false;
+        SetBodyAlpha(1f);
+
+        if (bodyAnimator != null)
+        {
+            bodyAnimator.SetFloat(SpeedParameterHash, 0f);
+
+            if (HasAnimatorTrigger(bodyAnimator, DeathParameterHash))
+            {
+                bodyAnimator.SetTrigger(DeathParameterHash);
+            }
+        }
+
+        rigidbody2d.linearVelocity = Vector2.zero;
+        rigidbody2d.angularVelocity = 0f;
+
+        gameOverManager ??= FindAnyObjectByType<GameOverManager>();
+
+        if (gameOverManager != null)
+        {
+            gameOverManager.ShowGameOver();
+            return;
+        }
+
+        Debug.LogWarning("Player died but no GameOverManager was found in the scene.", this);
+    }
+
+    private static bool HasAnimatorTrigger(Animator animator, int parameterHash)
+    {
+        if (animator == null)
+        {
+            return false;
+        }
+
+        foreach (AnimatorControllerParameter parameter in animator.parameters)
+        {
+            if (parameter.type == AnimatorControllerParameterType.Trigger && parameter.nameHash == parameterHash)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private bool CheckGrounded()
