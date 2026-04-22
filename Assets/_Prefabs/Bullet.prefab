@@ -170,6 +170,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Projectile
   lifetime: 3
+  damageLayers:
+    serializedVersion: 2
+    m_Bits: 128
   groundLayers:
     serializedVersion: 2
-    m_Bits: 192
+    m_Bits: 64

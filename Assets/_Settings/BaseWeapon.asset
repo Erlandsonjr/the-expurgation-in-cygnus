@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1036b74c66c44743afa22b1d0486184a, type: 3}
   m_Name: BaseWeapon
   m_EditorClassIdentifier: Assembly-CSharp::WeaponData
-  damage: 10
+  damage: 2
   fireRate: 2
   projectileSpeed: 15

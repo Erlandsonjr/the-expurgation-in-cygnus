@@ -1,11 +1,16 @@
+using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
 
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(BoxCollider2D))]
-public sealed class PlayerController : MonoBehaviour
+public sealed class PlayerController : MonoBehaviour, IDamageable
 {
+    private static readonly int SpeedParameterHash = Animator.StringToHash("Speed");
+    private const float InvincibilityFlickerInterval = 0.08f;
+
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 8f;
     [SerializeField] private float acceleration = 90f;
@@ -27,20 +32,41 @@ public sealed class PlayerController : MonoBehaviour
     [FormerlySerializedAs("pivot")]
     [SerializeField] private Transform aimPivot;
 
+    [Header("Presentation")]
+    [SerializeField] private Animator bodyAnimator;
+    [SerializeField] private SpriteRenderer bodySpriteRenderer;
+
+    [Header("Health")]
+    [SerializeField] private float maxHealth = 5f;
+    [SerializeField] private float invincibilityDuration = 1f;
+    [SerializeField] private float knockbackForce = 9f;
+    [SerializeField] private float knockbackTotalTime = 0.2f;
+
     [Header("Combat")]
     [SerializeField] private WeaponData activeWeapon;
     [SerializeField] private ProjectilePooler projectilePooler;
 
     private BoxCollider2D boxCollider;
+    private Color bodyDefaultColor = Color.white;
     private Camera mainCamera;
+    private float currentHealth;
+    private Coroutine invincibilityRoutine;
+    private float knockbackCounter;
     private Rigidbody2D rigidbody2d;
 
     private float coyoteCounter;
     private float jumpBufferCounter;
-    private float moveInput;
     private float shotCooldownTimer;
+    private bool isInvincible;
+    private Vector2 moveInput;
     private bool isGrounded;
     private bool jumpHeld;
+
+    public event Action<float, float> HealthChanged;
+
+    public bool IsInvincible => isInvincible;
+    public float CurrentHealth => currentHealth;
+    public float MaxHealth => maxHealth;
 
     private void Awake()
     {
@@ -55,12 +81,45 @@ public sealed class PlayerController : MonoBehaviour
 
         rigidbody2d.gravityScale = baseGravityScale;
         aimPivot ??= transform.Find("Pivot");
+
+        Transform bodyTransform = transform.Find("Body");
+        if (bodyTransform != null)
+        {
+            bodyAnimator ??= bodyTransform.GetComponent<Animator>();
+            bodySpriteRenderer ??= bodyTransform.GetComponent<SpriteRenderer>();
+        }
+
+        bodyAnimator ??= GetComponentInChildren<Animator>();
+        bodySpriteRenderer ??= GetComponentInChildren<SpriteRenderer>();
+
+        maxHealth = maxHealth > 0f ? maxHealth : 5f;
+        invincibilityDuration = Mathf.Max(0f, invincibilityDuration);
+        knockbackForce = Mathf.Max(0f, knockbackForce);
+        currentHealth = maxHealth;
+        isInvincible = false;
+
+        if (bodySpriteRenderer != null)
+        {
+            bodyDefaultColor = bodySpriteRenderer.color;
+        }
+
+        NotifyHealthChanged();
     }
 
     private void Update()
     {
-        moveInput = ReadHorizontalInput();
+        if (knockbackCounter > 0f)
+        {
+            knockbackCounter = Mathf.Max(0f, knockbackCounter - Time.deltaTime);
+            moveInput = Vector2.zero;
+        }
+        else
+        {
+            moveInput = ReadMoveInput();
+        }
+
         jumpHeld = IsJumpHeld();
+        UpdateAnimation();
 
         if (WasJumpPressedThisFrame())
         {
@@ -81,14 +140,18 @@ public sealed class PlayerController : MonoBehaviour
         isGrounded = rigidbody2d.linearVelocity.y > 0.01f ? false : CheckGrounded();
         coyoteCounter = isGrounded ? coyoteTime : Mathf.Max(0f, coyoteCounter - Time.fixedDeltaTime);
 
-        ApplyHorizontalMovement();
+        if (knockbackCounter <= 0f)
+        {
+            ApplyHorizontalMovement();
+        }
+
         TryConsumeJump();
         ApplyVariableGravity();
     }
 
     private void ApplyHorizontalMovement()
     {
-        float targetSpeed = moveInput * moveSpeed;
+        float targetSpeed = moveInput.x * moveSpeed;
         float speedDelta = Mathf.Abs(targetSpeed) > 0.01f ? acceleration : deceleration;
         float nextVelocityX = Mathf.MoveTowards(rigidbody2d.linearVelocity.x, targetSpeed, speedDelta * Time.fixedDeltaTime);
 
@@ -149,6 +212,11 @@ public sealed class PlayerController : MonoBehaviour
         mouseScreenPosition.z = Mathf.Abs(mainCamera.transform.position.z - aimPivot.position.z);
 
         Vector3 mouseWorldPosition = mainCamera.ScreenToWorldPoint(mouseScreenPosition);
+        if (bodySpriteRenderer != null)
+        {
+            bodySpriteRenderer.flipX = mouseWorldPosition.x < transform.position.x;
+        }
+
         Vector2 aimDirection = mouseWorldPosition - aimPivot.position;
 
         if (aimDirection.sqrMagnitude <= 0.0001f)
@@ -158,6 +226,16 @@ public sealed class PlayerController : MonoBehaviour
 
         float aimAngle = Mathf.Atan2(aimDirection.y, aimDirection.x) * Mathf.Rad2Deg;
         aimPivot.rotation = Quaternion.Euler(0f, 0f, aimAngle);
+    }
+
+    private void UpdateAnimation()
+    {
+        if (bodyAnimator == null)
+        {
+            return;
+        }
+
+        bodyAnimator.SetFloat(SpeedParameterHash, moveInput.magnitude);
     }
 
     private void HandlePrimaryFire()
@@ -202,8 +280,99 @@ public sealed class PlayerController : MonoBehaviour
             return;
         }
 
-        projectile.Setup(activeWeapon.ProjectileSpeed);
+        projectile.Setup(activeWeapon.ProjectileSpeed, activeWeapon.Damage);
         shotCooldownTimer = activeWeapon.ShotInterval;
+    }
+
+    public void TakeDamage(float damage)
+    {
+        TakeDamage(damage, transform.position);
+    }
+
+    public void TakeDamage(float damage, Vector2 sourcePosition)
+    {
+        if (damage <= 0f || isInvincible)
+        {
+            return;
+        }
+
+        currentHealth = Mathf.Max(0f, currentHealth - damage);
+        knockbackCounter = knockbackTotalTime;
+        NotifyHealthChanged();
+
+        StartInvincibilityFrames();
+        ApplyKnockback(sourcePosition);
+    }
+
+    public void UpdateUI()
+    {
+        NotifyHealthChanged();
+    }
+
+    private void ApplyKnockback(Vector2 sourcePosition)
+    {
+        if (knockbackForce <= 0f)
+        {
+            return;
+        }
+
+        Vector2 knockbackDirection = (Vector2)transform.position - sourcePosition;
+        if (knockbackDirection.sqrMagnitude <= 0.0001f)
+        {
+            knockbackDirection = Vector2.right;
+        }
+
+        knockbackDirection = knockbackDirection.normalized;
+        rigidbody2d.linearVelocity = Vector2.zero;
+        rigidbody2d.AddForce(knockbackDirection * knockbackForce, ForceMode2D.Impulse);
+    }
+
+    private void StartInvincibilityFrames()
+    {
+        if (invincibilityRoutine != null)
+        {
+            StopCoroutine(invincibilityRoutine);
+        }
+
+        invincibilityRoutine = StartCoroutine(InvincibilityRoutine());
+    }
+
+    private IEnumerator InvincibilityRoutine()
+    {
+        isInvincible = true;
+        float elapsed = 0f;
+        bool faded = false;
+
+        while (elapsed < invincibilityDuration)
+        {
+            SetBodyAlpha(faded ? 1f : 0.2f);
+            faded = !faded;
+
+            float waitDuration = Mathf.Min(InvincibilityFlickerInterval, invincibilityDuration - elapsed);
+            yield return new WaitForSeconds(waitDuration);
+            elapsed += waitDuration;
+        }
+
+        SetBodyAlpha(1f);
+        isInvincible = false;
+        invincibilityRoutine = null;
+    }
+
+    private void SetBodyAlpha(float alpha)
+    {
+        if (bodySpriteRenderer == null)
+        {
+            return;
+        }
+
+        Color color = bodyDefaultColor;
+        color.a = alpha;
+        bodySpriteRenderer.color = color;
+    }
+
+    private void NotifyHealthChanged()
+    {
+        HealthChanged?.Invoke(currentHealth, maxHealth);
     }
 
     private bool CheckGrounded()
@@ -215,27 +384,27 @@ public sealed class PlayerController : MonoBehaviour
         return hit.collider != null;
     }
 
-    private static float ReadHorizontalInput()
+    private static Vector2 ReadMoveInput()
     {
         Keyboard keyboard = Keyboard.current;
         if (keyboard == null)
         {
-            return 0f;
+            return Vector2.zero;
         }
 
-        float input = 0f;
+        float horizontalInput = 0f;
 
         if (keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed)
         {
-            input -= 1f;
+            horizontalInput -= 1f;
         }
 
         if (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed)
         {
-            input += 1f;
+            horizontalInput += 1f;
         }
 
-        return input;
+        return new Vector2(horizontalInput, 0f);
     }
 
     private static bool IsJumpHeld()
@@ -256,6 +425,22 @@ public sealed class PlayerController : MonoBehaviour
         return mouse != null && mouse.leftButton.isPressed;
     }
 
+    private void OnDisable()
+    {
+        if (invincibilityRoutine != null)
+        {
+            StopCoroutine(invincibilityRoutine);
+            invincibilityRoutine = null;
+        }
+
+        isInvincible = false;
+
+        if (bodySpriteRenderer != null)
+        {
+            bodySpriteRenderer.color = bodyDefaultColor;
+        }
+    }
+
     private void OnValidate()
     {
         moveSpeed = Mathf.Max(0f, moveSpeed);
@@ -268,5 +453,9 @@ public sealed class PlayerController : MonoBehaviour
         fallGravityMultiplier = Mathf.Max(1f, fallGravityMultiplier);
         lowJumpGravityMultiplier = Mathf.Max(1f, lowJumpGravityMultiplier);
         groundCheckDistance = Mathf.Max(0.01f, groundCheckDistance);
+        maxHealth = Mathf.Max(0.01f, maxHealth);
+        invincibilityDuration = Mathf.Max(0f, invincibilityDuration);
+        knockbackForce = Mathf.Max(0f, knockbackForce);
+        knockbackTotalTime = Mathf.Max(0f, knockbackTotalTime);
     }
 }
