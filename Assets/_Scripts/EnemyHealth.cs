@@ -7,11 +7,11 @@ public interface IDamageable
 }
 
 [DisallowMultipleComponent]
-[RequireComponent(typeof(SpriteRenderer))]
 public sealed class EnemyHealth : MonoBehaviour, IDamageable
 {
     [SerializeField] private float maxHealth = 3f;
     [SerializeField] private float flashDuration = 0.1f;
+    [SerializeField] private Color flashColor = new Color(1f, 0.25f, 0.25f, 1f); // bright red tint
     [SerializeField] private SpriteRenderer spriteRenderer;
 
     private Color baseColor = Color.white;
@@ -24,7 +24,7 @@ public sealed class EnemyHealth : MonoBehaviour, IDamageable
 
     private void Awake()
     {
-        spriteRenderer ??= GetComponent<SpriteRenderer>();
+        spriteRenderer ??= GetComponent<SpriteRenderer>() ?? GetComponentInChildren<SpriteRenderer>();
         CacheDefaultColor();
     }
 
@@ -33,7 +33,7 @@ public sealed class EnemyHealth : MonoBehaviour, IDamageable
         maxHealth = maxHealth > 0f ? maxHealth : 1f;
         flashDuration = Mathf.Max(0.01f, flashDuration);
 
-        spriteRenderer ??= GetComponent<SpriteRenderer>();
+        spriteRenderer ??= GetComponent<SpriteRenderer>() ?? GetComponentInChildren<SpriteRenderer>();
         CacheDefaultColor();
         baseColor = defaultColor;
         currentHealth = maxHealth;
@@ -117,13 +117,18 @@ public sealed class EnemyHealth : MonoBehaviour, IDamageable
     {
         if (spriteRenderer != null)
         {
-            spriteRenderer.color = Color.white;
+            spriteRenderer.color = flashColor;
         }
 
         yield return new WaitForSeconds(flashDuration);
 
         if (destroyAfterFlash)
         {
+            if (ScoreManager.Instance != null)
+            {
+                ScoreManager.Instance.AddScore(1);
+            }
+
             Destroy(gameObject);
             yield break;
         }
@@ -162,7 +167,9 @@ public sealed class EnemyHealth : MonoBehaviour, IDamageable
     {
         if (spriteRenderer != null)
         {
-            spriteRenderer.color = baseColor;
+            // Always revert to white so the sprite displays at its natural colour.
+            // baseColor is retained for systems that need to query the logical tint.
+            spriteRenderer.color = Color.white;
         }
     }
 }

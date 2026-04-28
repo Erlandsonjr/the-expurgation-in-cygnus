@@ -6,7 +6,7 @@ Week 3 - AI & Level 1 Management
 
 ## Active Task
 
-Implementing Combat Loop V1: enemy damage, player contact damage, death handling, and hit-feedback integration on top of the Week 3 enemy and spawning foundation.
+Scaffolding the Week 5 Upgrade System: ScriptableObject data layer (UpgradeItem), manager logic with ApplyUpgrade, and 3-choice inter-wave UI.
 
 ## Roadmap Alignment
 
@@ -61,6 +61,23 @@ With Week 2 finalized, the project can now move into enemy behavior and encounte
 - The game now has a functional health HUD path: `PlayerController` exposes health state and broadcasts updates, and `HealthBarUI` can drive a Unity UI Slider for live health monitoring.
 - Knockback is now 360-degree compliant and physics-resetting: the Purger clears existing velocity before the impulse, is pushed directly away from the attacker, and starts iFrame flicker at the impact moment.
 - Fail State (Death/Restart) is now fully implemented: lethal player damage enters a death state, shows the Game Over screen, freezes gameplay, and allows the active scene to be restarted from UI.
+- Game Over screen was restyled with a Cyberpunk aesthetic: panel background set to near-opaque black (#000000E6), title TMP changed to Neon Red (#FF004D) Bold with Center alignment, RestartButton darkened to #222222 with Pure White Bold button label.
+- Score HUD element ScoreText created as a child of the main Canvas, anchored top-right with a margin offset (Pos X: -150, Pos Y: -50), displaying initial text 'PURIFIED: 0' in White Bold at font size 32.
+- GameOver UI layout fixed: title text anchoredPosition set to (0, 150), RestartButton anchoredPosition set to (0, -50).
+- ScoreManager singleton created and attached to the Canvas; ScoreText reference wired via inspector. Enemy death in EnemyHealth now calls ScoreManager.Instance.AddScore(1) before Destroy.
+- WaveManager refactored to Wave System V2: WaveData struct (enemyCount, spawnRate) drives 10 designer-tuned waves; spawning stops at quota; when living enemies reach 0 the wave ends with Time.timeScale=0 and a WAVE COMPLETE log; AdvanceToNextWave() resumes play.
+- ArkanoSniperAI.cs fully implemented: kinematic flying enemy with smooth X tracking at +6 Y offset above the player. Periodic shooting via FireRoutine coroutine — fires every fireRate seconds; FireProjectile() instantiates the projectile prefab, rotates it to face the player, and calls Projectile.Setup(Speed, sniperDamage). Projectile.cs updated with defaultSpeed serialized field and Speed getter so sniper can read the prefab's speed before calling Setup().
+- WaveManager V2 updated: SpawnEnemy() detects ArkanoSniperAI on the prefab and passes isSniper=true to PickSpawnPoint(), which excludes spawn points with 'South' in the name and the lowest-Y point, so snipers only spawn from elevated positions. OnWaveCleared() now calls UpgradeManager.Instance.ShowPanel() and sets Time.timeScale=0 instead of only logging. Wave[0] uses enemyCount=7 for a solid first-wave challenge.
+- UpgradeManager.cs created: singleton MonoBehaviour on Canvas. ShowPanel() activates UpgradePanel; HidePanel() deactivates it then calls WaveManager.AdvanceToNextWave() (or restores timeScale as fallback).
+- UpgradePanel created in scene as a full-screen Canvas child: semi-opaque black background (#000000E6), inactive by default. Contains WaveClearedTitle TMP ('WAVE CLEARED', White Bold 48pt, centered at y=+100) and NextWaveButton (dark #222222 background, 300×60, centered at y=-50) with 'NEXT WAVE' White Bold 24pt child TMP label.
+- NextWaveButton.onClick wired via UnityEventTools to UpgradeManager.HidePanel (persistent listener).
+- UpgradeManager component attached to Canvas (ID 51844), upgradePanel reference assigned to UpgradePanel (ID -23680).
+- **Wave 1 balance is fixed**: Wave 1 enemyCount is set to 7, giving a solid first-wave challenge density against Arkano Scouts.
+- **Arkano Sniper is now a project asset**: `ArkanoSniper.prefab` created at `Assets/_Prefabs/Enemies/ArkanoSniper.prefab`. It has `ArkanoSniperAI`, a kinematic `Rigidbody2D`, a trigger `CircleCollider2D`, a `Body` child with a cyan (#00F3FF) `SpriteRenderer` using the Sprites-Default material, and a `FirePoint` child at local offset (0.5, 0, 0). `EnemyProjectile` and `FirePoint` are wired to `ArkanoSniperAI` in the prefab.
+- **Wave 2 now includes the Sniper**: `WaveData` struct extended with `allowedEnemyPrefabs` (per-wave prefab override list). Wave 2's `allowedEnemyPrefabs` is set to [Arkano Scout, ArkanoSniper] so Wave 2 can spawn either enemy type. `SpawnEnemy()` chooses a random prefab from the wave's override list (falls back to the global `enemyPrefab` when empty) and checks the chosen prefab for `ArkanoSniperAI` before calling `PickSpawnPoint()`, ensuring snipers always get elevated non-South spawn points.
+- **Upgrade System data layer scaffolded**: `UpgradeItem.cs` (`ScriptableObject`) created with `upgradeName`, `description`, `statModifierID`, and `value` fields; asset menu path `The Expurgation/Upgrade Item`. Folder `Assets/_ScriptableObjects/Upgrades/` created to hold authored assets.
+- **UpgradeManager V2**: `public List<UpgradeItem> availableUpgrades` added. `ApplyUpgrade(UpgradeItem item)` method logs the selection and delegates to `HidePanel()` / `AdvanceToNextWave()`.
+- **Upgrade Panel UI refactored**: `NextWaveButton` (ID 57664) removed. `UpgradeChoicesContainer` (`HorizontalLayoutGroup`, ID -11188) added as child of `UpgradePanel`. Three choice buttons created: `UpgradeChoice_1` (ID -11196), `UpgradeChoice_2` (ID -11218), `UpgradeChoice_3` (ID -11240). Each has a dark `#222222` `Image`, a `Button`, and a Bold White `TextMeshProUGUI` child label. SampleScene saved.
 
 ## Week 2 Implemented Architecture
 
@@ -106,4 +123,4 @@ The WaveManager is now ready for direct scene assignment through authored spawn 
 
 ## Next Goal
 
-Week 3 - expand enemy behaviors, stabilize wave spawning, and connect the first Level 1 encounter loop.
+Week 3 — playtest Wave System V2 end-to-end: assign ArkanoSniperAI prefab to WaveManager wave slots, assign projectile prefab and firePoint to sniper prefab(s) in the inspector, confirm UpgradePanel triggers correctly on wave clear, and verify all 10 waves complete without console errors.

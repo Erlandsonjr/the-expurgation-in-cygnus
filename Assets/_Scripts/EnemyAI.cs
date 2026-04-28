@@ -3,7 +3,7 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody2D))]
 public sealed class EnemyAI : MonoBehaviour
 {
-    private static readonly Color ArkanoBaseColor = new(1f, 0f, 0f, 1f);
+    private static readonly Color ArkanoBaseColor = new(1f, 1f, 1f, 1f);
     private static readonly Color DashWarningColor = new(1f, 0.64705884f, 0f, 1f);
     private const float DashPreparationDuration = 0.2f;
 
@@ -34,7 +34,7 @@ public sealed class EnemyAI : MonoBehaviour
     private Vector2 currentMoveDirection;
     private Vector2 dashTargetPosition;
     private Vector2 lastKnownDirection;
-    private Color defaultColor = Color.red;
+    private Color defaultColor = Color.white;
     private EnemyHealth enemyHealth;
     private float dashCooldownTimer;
     private float dashPreparationTimer;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
@@ -10,6 +11,10 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 {
     private static readonly int SpeedParameterHash = Animator.StringToHash("Speed");
     private static readonly int DeathParameterHash = Animator.StringToHash("Death");
+    private static readonly int IsJumpingParameterHash = Animator.StringToHash("isJumping");
+    private static readonly int AimXParameterHash = Animator.StringToHash("aimX");
+    private static readonly int AimYParameterHash = Animator.StringToHash("aimY");
+    private static readonly int IsDashingParameterHash = Animator.StringToHash("isDashing");
     private const float InvincibilityFlickerInterval = 0.08f;
 
     [Header("Movement")]
@@ -33,6 +38,10 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     [FormerlySerializedAs("pivot")]
     [SerializeField] private Transform aimPivot;
 
+    [Header("Weapon Visual")]
+    [SerializeField] private Transform weaponPivot;
+    [SerializeField] private SpriteRenderer weaponVisualRenderer;
+
     [Header("Presentation")]
     [SerializeField] private Animator bodyAnimator;
     [SerializeField] private SpriteRenderer bodySpriteRenderer;
@@ -47,12 +56,30 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     [SerializeField] private WeaponData activeWeapon;
     [SerializeField] private ProjectilePooler projectilePooler;
 
+    [Header("Runtime Modifiers")]
+    public float fireRateMultiplier = 1f;
+    public float damageMultiplier = 1f;
+    public float projSpeedMultiplier = 1f;
+
+    [Header("Dash")]
+    public float dashSpeed = 25f;
+    public float dashDuration = 0.2f;
+    public float dashCooldown = 7f;
+
     [Header("UI")]
     [SerializeField] private GameOverManager gameOverManager;
+    [SerializeField] public Sprite[] healthSprites;
+    [SerializeField] public UnityEngine.UI.Image healthBarImage;
+    [SerializeField] public UnityEngine.UI.Image dashCooldownFill;
+
+    [Header("Laser")]
+    public LineRenderer laserLine;
+    public GameObject continuousLaserVisual;
 
     private BoxCollider2D boxCollider;
     private Color bodyDefaultColor = Color.white;
     private Camera mainCamera;
+    private Coroutine continuousLaserRoutine;
     private float currentHealth;
     private Coroutine invincibilityRoutine;
     private float knockbackCounter;
@@ -61,11 +88,15 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     private float coyoteCounter;
     private float jumpBufferCounter;
     private float shotCooldownTimer;
+    private bool isFiringLaser;
     private bool isInvincible;
     private bool isDead;
     private Vector2 moveInput;
     private bool isGrounded;
     private bool jumpHeld;
+    private Vector2 lastAimWorldPosition;
+    private float lastDashTime = -10f;
+    public bool isDashing = false;
 
     public event Action<float, float> HealthChanged;
 
@@ -87,6 +118,15 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         rigidbody2d.gravityScale = baseGravityScale;
         aimPivot ??= transform.Find("Pivot");
 
+        if (weaponPivot == null)
+            weaponPivot = transform.Find("WeaponPivot");
+        if (weaponVisualRenderer == null)
+        {
+            Transform wv = weaponPivot != null ? weaponPivot.Find("WeaponVisual") : null;
+            if (wv != null)
+                weaponVisualRenderer = wv.GetComponent<SpriteRenderer>();
+        }
+
         Transform bodyTransform = transform.Find("Body");
         if (bodyTransform != null)
         {
@@ -98,6 +138,34 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         bodySpriteRenderer ??= GetComponentInChildren<SpriteRenderer>();
         gameOverManager ??= FindAnyObjectByType<GameOverManager>();
 
+        if (dashCooldownFill == null)
+        {
+            Transform dashFillTransform = GameObject.Find("Canvas")?.transform.Find("DashCooldownBar/Fill");
+            if (dashFillTransform != null)
+            {
+                dashCooldownFill = dashFillTransform.GetComponent<UnityEngine.UI.Image>();
+            }
+        }
+
+        if (healthBarImage == null)
+        {
+            Transform healthBarTransform = GameObject.Find("Canvas")?.transform.Find("HealthBar");
+            if (healthBarTransform != null)
+            {
+                healthBarImage = healthBarTransform.GetComponent<UnityEngine.UI.Image>();
+            }
+        }
+
+        if (continuousLaserVisual == null && aimPivot != null)
+        {
+            continuousLaserVisual = aimPivot.Find("LaserBeamVisual")?.gameObject;
+        }
+
+        if (laserLine == null && continuousLaserVisual != null)
+        {
+            laserLine = continuousLaserVisual.GetComponent<LineRenderer>();
+        }
+
         maxHealth = maxHealth > 0f ? maxHealth : 5f;
         invincibilityDuration = Mathf.Max(0f, invincibilityDuration);
         knockbackForce = Mathf.Max(0f, knockbackForce);
@@ -108,6 +176,21 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         if (bodySpriteRenderer != null)
         {
             bodyDefaultColor = bodySpriteRenderer.color;
+        }
+
+        // Equip default weapon (FirstWeapon) if none assigned in the Inspector.
+        if (activeWeapon == null)
+        {
+            var defaultWeapon = UnityEngine.Resources.Load<WeaponData>("FirstWeapon");
+            if (defaultWeapon == null)
+                defaultWeapon = UnityEngine.Resources.FindObjectsOfTypeAll<WeaponData>()
+                    is WeaponData[] all && all.Length > 0 ? all[0] : null;
+            if (defaultWeapon != null)
+                EquipWeapon(defaultWeapon);
+        }
+        else if (weaponVisualRenderer != null)
+        {
+            weaponVisualRenderer.sprite = activeWeapon.WeaponSprite;
         }
 
         NotifyHealthChanged();
@@ -145,6 +228,8 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         shotCooldownTimer = Mathf.Max(0f, shotCooldownTimer - Time.deltaTime);
         UpdateAim();
         HandlePrimaryFire();
+        HandleDash();
+        UpdateDashCooldownUI();
     }
 
     private void FixedUpdate()
@@ -159,7 +244,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         isGrounded = rigidbody2d.linearVelocity.y > 0.01f ? false : CheckGrounded();
         coyoteCounter = isGrounded ? coyoteTime : Mathf.Max(0f, coyoteCounter - Time.fixedDeltaTime);
 
-        if (knockbackCounter <= 0f)
+        if (knockbackCounter <= 0f && !isDashing)
         {
             ApplyHorizontalMovement();
         }
@@ -231,9 +316,14 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         mouseScreenPosition.z = Mathf.Abs(mainCamera.transform.position.z - aimPivot.position.z);
 
         Vector3 mouseWorldPosition = mainCamera.ScreenToWorldPoint(mouseScreenPosition);
+        lastAimWorldPosition = mouseWorldPosition;
         if (bodySpriteRenderer != null)
         {
-            bodySpriteRenderer.flipX = mouseWorldPosition.x < transform.position.x;
+            // Mirror the body by flipping localScale.x so children scale with it.
+            Transform bodyTransform = bodySpriteRenderer.transform;
+            bool facingLeft = mouseWorldPosition.x < transform.position.x;
+            Vector3 s = bodyTransform.localScale;
+            bodyTransform.localScale = new Vector3(facingLeft ? -Mathf.Abs(s.x) : Mathf.Abs(s.x), s.y, s.z);
         }
 
         Vector2 aimDirection = mouseWorldPosition - aimPivot.position;
@@ -245,6 +335,17 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
         float aimAngle = Mathf.Atan2(aimDirection.y, aimDirection.x) * Mathf.Rad2Deg;
         aimPivot.rotation = Quaternion.Euler(0f, 0f, aimAngle);
+
+        if (weaponPivot != null)
+            weaponPivot.rotation = Quaternion.Euler(0f, 0f, aimAngle);
+
+        if (weaponVisualRenderer != null)
+        {
+            bool mouseLeft = mouseWorldPosition.x < transform.position.x;
+            Transform wvt = weaponVisualRenderer.transform;
+            // Uniform 0.4 scale so the weapon is not squashed and stays small.
+            wvt.localScale = new Vector3(0.4f, mouseLeft ? -0.4f : 0.4f, 1f);
+        }
     }
 
     private void UpdateAnimation()
@@ -255,6 +356,14 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         }
 
         bodyAnimator.SetFloat(SpeedParameterHash, moveInput.magnitude);
+        bodyAnimator.SetBool(IsJumpingParameterHash, !isGrounded);
+        bodyAnimator.SetBool(IsDashingParameterHash, isDashing);
+
+        Vector2 aimDir = lastAimWorldPosition.sqrMagnitude > 0.0001f
+            ? ((Vector3)lastAimWorldPosition - transform.position).normalized
+            : Vector2.right;
+        bodyAnimator.SetFloat(AimXParameterHash, aimDir.x);
+        bodyAnimator.SetFloat(AimYParameterHash, aimDir.y);
     }
 
     private void HandlePrimaryFire()
@@ -267,18 +376,217 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         TryFireProjectile();
     }
 
-    private void TryFireProjectile()
+    private void HandleDash()
     {
-        if (activeWeapon == null || projectilePooler == null || aimPivot == null || shotCooldownTimer > 0f)
+        if (!WasSecondaryFirePressedThisFrame() || isDashing || Time.time < lastDashTime + dashCooldown)
         {
             return;
         }
 
-        GameObject projectileObject = projectilePooler.GetProjectile(aimPivot.position, aimPivot.rotation);
-        if (projectileObject == null)
+        StartCoroutine(DashRoutine());
+    }
+
+    private void UpdateDashCooldownUI()
+    {
+        if (dashCooldownFill == null)
+        {
+            Transform dashFillTransform = GameObject.Find("Canvas")?.transform.Find("DashCooldownBar/Fill");
+            if (dashFillTransform != null)
+            {
+                dashCooldownFill = dashFillTransform.GetComponent<UnityEngine.UI.Image>();
+            }
+        }
+
+        if (dashCooldownFill != null)
+        {
+            float elapsed = Time.time - lastDashTime;
+            float ratio = dashCooldown > 0f ? Mathf.Clamp01(elapsed / dashCooldown) : 1f;
+            dashCooldownFill.fillAmount = isDashing ? 0f : ratio;
+        }
+    }
+
+    private IEnumerator DashRoutine()
+    {
+        isDashing = true;
+        if (dashCooldownFill != null) dashCooldownFill.fillAmount = 0f;
+        if (bodySpriteRenderer != null)
+            bodySpriteRenderer.color = new Color(1f, 1f, 1f, 0.5f);
+
+        Vector2 dashDir = ((Vector3)lastAimWorldPosition - transform.position).normalized;
+        if (dashDir.sqrMagnitude < 0.0001f)
+        {
+            dashDir = Vector2.right;
+        }
+
+        rigidbody2d.linearVelocity = dashDir * dashSpeed;
+
+        yield return new WaitForSeconds(dashDuration);
+
+        isDashing = false;
+        if (bodySpriteRenderer != null)
+            bodySpriteRenderer.color = bodyDefaultColor;
+        lastDashTime = Time.time;
+    }
+
+    /// <summary>Equips a new weapon, updating stats and the visual sprite immediately.</summary>
+    public void EquipWeapon(WeaponData newWeapon)
+    {
+        if (newWeapon == null) return;
+        activeWeapon = newWeapon;
+        shotCooldownTimer = 0f;
+        if (weaponVisualRenderer != null)
+            weaponVisualRenderer.sprite = newWeapon.WeaponSprite;
+    }
+
+    // ── Stat modifier methods (called by UpgradeManager general upgrades) ─────
+    public void AddMaxHealth(float delta)
+    {
+        maxHealth = Mathf.Max(1f, maxHealth + delta);
+        currentHealth = Mathf.Min(currentHealth + delta, maxHealth);
+        NotifyHealthChanged();
+    }
+
+    public void AddMoveSpeed(float delta)      => moveSpeed    = Mathf.Max(1f, moveSpeed    + delta);
+    public void AddDashCooldown(float delta)   => dashCooldown = Mathf.Max(1f, dashCooldown + delta);
+    public void AddProjectileSpeed(float delta)
+    {
+        float baseProjectileSpeed = activeWeapon != null ? activeWeapon.ProjectileSpeed : 10f;
+        baseProjectileSpeed = Mathf.Max(1f, baseProjectileSpeed);
+        float nextMultiplier = (baseProjectileSpeed + delta) / baseProjectileSpeed;
+        projSpeedMultiplier = Mathf.Max(0.01f, projSpeedMultiplier * nextMultiplier);
+    }
+    public void AddJumpForce(float delta)      => jumpForce    = Mathf.Max(1f, jumpForce    + delta);
+
+    public void Heal(int amount)
+    {
+        if (amount <= 0 || isDead)
         {
             return;
         }
+
+        currentHealth = Mathf.Clamp(currentHealth + amount, 0f, maxHealth);
+        NotifyHealthChanged();
+    }
+
+    public void ApplyCard(CardData card)
+    {
+        if (card == null)
+        {
+            return;
+        }
+
+        switch (card.effectType)
+        {
+            case CardEffectType.Heal:
+                Heal(Mathf.RoundToInt(card.effectValue));
+                break;
+
+            case CardEffectType.MaxHealth:
+            {
+                int maxHealthBonus = Mathf.RoundToInt(card.effectValue);
+                if (maxHealthBonus <= 0)
+                {
+                    break;
+                }
+
+                maxHealth = Mathf.Max(1f, maxHealth + maxHealthBonus);
+                Heal(maxHealthBonus);
+                break;
+            }
+
+            case CardEffectType.MoveSpeed:
+                moveSpeed = Mathf.Max(1f, moveSpeed * card.effectValue);
+                break;
+
+            case CardEffectType.FireRate:
+                fireRateMultiplier = Mathf.Max(0.01f, fireRateMultiplier * card.effectValue);
+                break;
+
+            case CardEffectType.ProjectileSpeed:
+                projSpeedMultiplier = Mathf.Max(0.01f, projSpeedMultiplier * card.effectValue);
+                break;
+
+            case CardEffectType.JumpForce:
+                jumpForce = Mathf.Max(1f, jumpForce * card.effectValue);
+                break;
+        }
+
+        NotifyHealthChanged();
+    }
+
+    private float GetEffectiveDamage()
+    {
+        if (activeWeapon == null)
+        {
+            return 0f;
+        }
+
+        return activeWeapon.Damage * damageMultiplier;
+    }
+
+    private float GetEffectiveShotInterval()
+    {
+        if (activeWeapon == null)
+        {
+            return float.PositiveInfinity;
+        }
+
+        return activeWeapon.ShotInterval * fireRateMultiplier;
+    }
+
+    private float GetEffectiveProjectileSpeed()
+    {
+        if (activeWeapon == null)
+        {
+            return 0f;
+        }
+
+        return activeWeapon.ProjectileSpeed * projSpeedMultiplier;
+    }
+
+    private void TryFireProjectile()
+    {
+        if (activeWeapon == null || aimPivot == null)
+            return;
+
+        // --- Continuous Laser ---
+        if (activeWeapon.weaponType == WeaponType.ContinuousLaser)
+        {
+            if (isFiringLaser || shotCooldownTimer > 0f)
+            {
+                return;
+            }
+
+            if (continuousLaserVisual == null && aimPivot != null)
+            {
+                continuousLaserVisual = aimPivot.Find("LaserBeamVisual")?.gameObject;
+            }
+
+            if (laserLine == null && continuousLaserVisual != null)
+            {
+                laserLine = continuousLaserVisual.GetComponent<LineRenderer>();
+            }
+
+            if (continuousLaserVisual == null || laserLine == null)
+            {
+                return;
+            }
+
+            continuousLaserRoutine = StartCoroutine(LaserBeamRoutine(1f));
+            shotCooldownTimer = GetEffectiveShotInterval();
+            return;
+        }
+
+        if (shotCooldownTimer > 0f)
+            return;
+
+        // --- Normal / Explosive projectile ---
+        if (projectilePooler == null)
+            return;
+
+        GameObject projectileObject = projectilePooler.GetProjectile(aimPivot.position, aimPivot.rotation);
+        if (projectileObject == null)
+            return;
 
         Vector3 spawnPosition = aimPivot.position;
         Quaternion spawnRotation = aimPivot.rotation;
@@ -299,8 +607,87 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
             return;
         }
 
-        projectile.Setup(activeWeapon.ProjectileSpeed, activeWeapon.Damage);
-        shotCooldownTimer = activeWeapon.ShotInterval;
+        projectile.Setup(GetEffectiveProjectileSpeed(), GetEffectiveDamage());
+        projectile.isExplosive = activeWeapon.weaponType == WeaponType.Explosive;
+
+        projectileObject.transform.localScale = activeWeapon.weaponType == WeaponType.Explosive
+            ? new Vector3(0.025f, 0.025f, 1f)
+            : new Vector3(0.3f, 0.3f, 1f);
+
+        if (activeWeapon.weaponType == WeaponType.Explosive
+            && projectile.impactFrames != null
+            && projectile.impactFrames.Length > 0
+            && projectileObject.TryGetComponent(out SpriteRenderer projectileSpriteRenderer))
+        {
+            projectileSpriteRenderer.sprite = projectile.impactFrames[0];
+        }
+
+        shotCooldownTimer = GetEffectiveShotInterval();
+    }
+
+    private IEnumerator LaserBeamRoutine(float duration)
+    {
+        isFiringLaser = true;
+
+        if (continuousLaserVisual == null || laserLine == null || aimPivot == null || activeWeapon == null)
+        {
+            isFiringLaser = false;
+            continuousLaserRoutine = null;
+            yield break;
+        }
+
+        continuousLaserVisual.SetActive(true);
+        laserLine.enabled = true;
+
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            if (continuousLaserVisual == null || laserLine == null || aimPivot == null || activeWeapon == null)
+            {
+                break;
+            }
+
+            Vector3 origin = aimPivot.position;
+            Vector3 endPoint = origin + aimPivot.right * 30f;
+            laserLine.SetPosition(0, origin);
+            laserLine.SetPosition(1, endPoint);
+
+            RaycastHit2D[] hits = Physics2D.RaycastAll(origin, aimPivot.right, 30f, LayerMask.GetMask("Enemy"));
+            float damagePerFrame = GetEffectiveDamage() * Time.deltaTime;
+            HashSet<IDamageable> damagedTargets = new HashSet<IDamageable>();
+
+            foreach (RaycastHit2D hit in hits)
+            {
+                IDamageable damageable = hit.collider.GetComponentInParent<IDamageable>();
+                if (damageable != null && damagedTargets.Add(damageable))
+                {
+                    damageable.TakeDamage(damagePerFrame);
+                }
+            }
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (continuousLaserVisual != null)
+        {
+            continuousLaserVisual.SetActive(false);
+        }
+
+        if (laserLine != null)
+        {
+            laserLine.enabled = false;
+        }
+
+        isFiringLaser = false;
+        continuousLaserRoutine = null;
+    }
+
+    private System.Collections.IEnumerator HideLaserAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (laserLine != null) laserLine.enabled = false;
     }
 
     public void TakeDamage(float damage)
@@ -310,6 +697,8 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
     public void TakeDamage(float damage, Vector2 sourcePosition)
     {
+        if (isDashing) return;
+
         if (damage <= 0f || isInvincible || isDead)
         {
             return;
@@ -397,6 +786,23 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
     private void NotifyHealthChanged()
     {
+        if (healthBarImage == null)
+        {
+            Transform healthBarTransform = GameObject.Find("Canvas")?.transform.Find("HealthBar");
+            if (healthBarTransform != null)
+            {
+                healthBarImage = healthBarTransform.GetComponent<UnityEngine.UI.Image>();
+            }
+        }
+
+        if (healthBarImage != null && healthSprites != null && healthSprites.Length > 0)
+        {
+            float clampedHealth = Mathf.Clamp(currentHealth, 0f, healthSprites.Length - 1);
+            int spriteIndex = Mathf.Clamp(Mathf.CeilToInt((healthSprites.Length - 1) - clampedHealth), 0, healthSprites.Length - 1);
+            healthBarImage.sprite = healthSprites[spriteIndex];
+            healthBarImage.color = Color.white;
+        }
+
         HealthChanged?.Invoke(currentHealth, maxHealth);
     }
 
@@ -517,8 +923,32 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         return mouse != null && mouse.leftButton.isPressed;
     }
 
+    private static bool WasSecondaryFirePressedThisFrame()
+    {
+        Mouse mouse = Mouse.current;
+        return mouse != null && mouse.rightButton.wasPressedThisFrame;
+    }
+
     private void OnDisable()
     {
+        if (continuousLaserRoutine != null)
+        {
+            StopCoroutine(continuousLaserRoutine);
+            continuousLaserRoutine = null;
+        }
+
+        isFiringLaser = false;
+
+        if (continuousLaserVisual != null)
+        {
+            continuousLaserVisual.SetActive(false);
+        }
+
+        if (laserLine != null)
+        {
+            laserLine.enabled = false;
+        }
+
         if (invincibilityRoutine != null)
         {
             StopCoroutine(invincibilityRoutine);
@@ -549,5 +979,8 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         invincibilityDuration = Mathf.Max(0f, invincibilityDuration);
         knockbackForce = Mathf.Max(0f, knockbackForce);
         knockbackTotalTime = Mathf.Max(0f, knockbackTotalTime);
+        dashSpeed = Mathf.Max(0f, dashSpeed);
+        dashDuration = Mathf.Max(0f, dashDuration);
+        dashCooldown = Mathf.Max(0f, dashCooldown);
     }
 }
