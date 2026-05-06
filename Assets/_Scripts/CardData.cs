@@ -16,6 +16,17 @@ public enum CardEffectType
     FireRate,
     ProjectileSpeed,
     JumpForce,
+    FlatDamage,
+    DashCooldown,
+    Invulnerability,
+    Luck,
+    ExtraJumps,
+    DashExplosion,
+    CritNextShot,
+    CryoAmmo,
+    BerserkerRage,
+    RadiationAura,
+    SpreadShot,
 }
 
 [CreateAssetMenu(fileName = "CardData", menuName = "Cygnus/Cards/Card Data")]

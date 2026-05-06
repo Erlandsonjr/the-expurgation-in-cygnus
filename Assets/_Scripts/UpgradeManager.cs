@@ -25,6 +25,7 @@ public sealed class UpgradeManager : MonoBehaviour
     [SerializeField] public GameObject generalUpgradePanel;
     public Button[] generalChoiceButtons;
     public List<CardData> cardPool = new List<CardData>();
+    public float luckBonus = 0f;
 
     // ── Internal refs ────────────────────────────────────────────────────────
     private WaveManager waveManager;
@@ -172,9 +173,18 @@ public sealed class UpgradeManager : MonoBehaviour
             playerController = FindAnyObjectByType<PlayerController>();
         }
 
-        if (chosenCard != null && playerController != null)
+        if (chosenCard != null)
         {
-            playerController.ApplyCard(chosenCard);
+            if (chosenCard.effectType == CardEffectType.Luck)
+            {
+                luckBonus += chosenCard.effectValue;
+            }
+
+            if (playerController != null)
+            {
+                playerController.ApplyCard(chosenCard);
+            }
+
             Debug.Log($"[UpgradeManager] Card selected: {chosenCard.cardName}");
         }
 

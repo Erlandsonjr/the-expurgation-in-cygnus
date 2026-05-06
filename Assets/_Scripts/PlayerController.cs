@@ -60,6 +60,16 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     public float fireRateMultiplier = 1f;
     public float damageMultiplier = 1f;
     public float projSpeedMultiplier = 1f;
+    public float flatDamageBonus = 0f;
+    public float dashCooldownMultiplier = 1f;
+    public float extraIframeTime = 0f;
+    public int extraJumps = 0;
+    public bool hasDashExplosion = false;
+    public bool nextShotIsCrit = false;
+    public bool hasCryoAmmo = false;
+    public bool hasBerserkerRage = false;
+    public bool hasRadiationAura = false;
+    public bool hasSpreadShot = false;
 
     [Header("Dash")]
     public float dashSpeed = 25f;
@@ -75,6 +85,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     [Header("Laser")]
     public LineRenderer laserLine;
     public GameObject continuousLaserVisual;
+    public GameObject radiationAuraVisual;
 
     private BoxCollider2D boxCollider;
     private Color bodyDefaultColor = Color.white;
@@ -86,9 +97,11 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     private Rigidbody2D rigidbody2d;
 
     private float coyoteCounter;
+    private int currentJumps;
     private float jumpBufferCounter;
     private float shotCooldownTimer;
     private bool isFiringLaser;
+    private bool hasCritAfterDashUpgrade;
     private bool isInvincible;
     private bool isDead;
     private Vector2 moveInput;
@@ -159,6 +172,11 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         if (continuousLaserVisual == null && aimPivot != null)
         {
             continuousLaserVisual = aimPivot.Find("LaserBeamVisual")?.gameObject;
+        }
+
+        if (radiationAuraVisual == null)
+        {
+            radiationAuraVisual = transform.Find("RadiationAuraVisual")?.gameObject;
         }
 
         if (laserLine == null && continuousLaserVisual != null)
@@ -244,6 +262,11 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         isGrounded = rigidbody2d.linearVelocity.y > 0.01f ? false : CheckGrounded();
         coyoteCounter = isGrounded ? coyoteTime : Mathf.Max(0f, coyoteCounter - Time.fixedDeltaTime);
 
+        if (isGrounded)
+        {
+            currentJumps = 0;
+        }
+
         if (knockbackCounter <= 0f && !isDashing)
         {
             ApplyHorizontalMovement();
@@ -264,7 +287,14 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
     private void TryConsumeJump()
     {
-        if (jumpBufferCounter <= 0f || coyoteCounter <= 0f)
+        if (jumpBufferCounter <= 0f)
+        {
+            return;
+        }
+
+        bool canGroundJump = coyoteCounter > 0f;
+        bool canExtraJump = !canGroundJump && currentJumps <= extraJumps;
+        if (!canGroundJump && !canExtraJump)
         {
             return;
         }
@@ -273,6 +303,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         nextVelocity.y = jumpForce;
         rigidbody2d.linearVelocity = nextVelocity;
 
+        currentJumps += 1;
         coyoteCounter = 0f;
         jumpBufferCounter = 0f;
         isGrounded = false;
@@ -378,7 +409,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
     private void HandleDash()
     {
-        if (!WasSecondaryFirePressedThisFrame() || isDashing || Time.time < lastDashTime + dashCooldown)
+        if (!WasSecondaryFirePressedThisFrame() || isDashing || Time.time < lastDashTime + GetEffectiveDashCooldown())
         {
             return;
         }
@@ -399,14 +430,35 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
         if (dashCooldownFill != null)
         {
-            float elapsed = Time.time - lastDashTime;
-            float ratio = dashCooldown > 0f ? Mathf.Clamp01(elapsed / dashCooldown) : 1f;
-            dashCooldownFill.fillAmount = isDashing ? 0f : ratio;
+            if (isDashing)
+            {
+                dashCooldownFill.fillAmount = 0f;
+            }
+            else
+            {
+                float timeSinceDash = Time.time - lastDashTime;
+                float currentCooldown = GetEffectiveDashCooldown();
+                dashCooldownFill.fillAmount = Mathf.Clamp01(timeSinceDash / currentCooldown);
+            }
         }
     }
 
     private IEnumerator DashRoutine()
     {
+        if (hasDashExplosion)
+        {
+            Collider2D[] blastHits = Physics2D.OverlapCircleAll(transform.position, 4f);
+            HashSet<IDamageable> damagedTargets = new HashSet<IDamageable>();
+            foreach (Collider2D hit in blastHits)
+            {
+                IDamageable damageable = hit.GetComponentInParent<IDamageable>();
+                if (damageable != null && damagedTargets.Add(damageable))
+                {
+                    damageable.TakeDamage(3f);
+                }
+            }
+        }
+
         isDashing = true;
         if (dashCooldownFill != null) dashCooldownFill.fillAmount = 0f;
         if (bodySpriteRenderer != null)
@@ -426,6 +478,11 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         if (bodySpriteRenderer != null)
             bodySpriteRenderer.color = bodyDefaultColor;
         lastDashTime = Time.time;
+
+        if (hasCritAfterDashUpgrade)
+        {
+            nextShotIsCrit = true;
+        }
     }
 
     /// <summary>Equips a new weapon, updating stats and the visual sprite immediately.</summary>
@@ -509,6 +566,53 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
             case CardEffectType.JumpForce:
                 jumpForce = Mathf.Max(1f, jumpForce * card.effectValue);
                 break;
+
+            case CardEffectType.FlatDamage:
+                flatDamageBonus += card.effectValue;
+                break;
+
+            case CardEffectType.DashCooldown:
+                dashCooldownMultiplier = Mathf.Max(0.01f, dashCooldownMultiplier * card.effectValue);
+                break;
+
+            case CardEffectType.Invulnerability:
+                extraIframeTime += card.effectValue;
+                break;
+
+            case CardEffectType.Luck:
+                break;
+
+            case CardEffectType.ExtraJumps:
+                extraJumps += Mathf.RoundToInt(card.effectValue);
+                break;
+
+            case CardEffectType.DashExplosion:
+                hasDashExplosion = true;
+                break;
+
+            case CardEffectType.CritNextShot:
+                hasCritAfterDashUpgrade = true;
+                break;
+
+            case CardEffectType.CryoAmmo:
+                hasCryoAmmo = true;
+                break;
+
+            case CardEffectType.BerserkerRage:
+                hasBerserkerRage = true;
+                break;
+
+            case CardEffectType.RadiationAura:
+                hasRadiationAura = true;
+                if (radiationAuraVisual != null)
+                {
+                    radiationAuraVisual.SetActive(true);
+                }
+                break;
+
+            case CardEffectType.SpreadShot:
+                hasSpreadShot = true;
+                break;
         }
 
         NotifyHealthChanged();
@@ -521,7 +625,13 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
             return 0f;
         }
 
-        return activeWeapon.Damage * damageMultiplier;
+        float finalDmg = (activeWeapon.Damage * damageMultiplier) + flatDamageBonus;
+        if (hasBerserkerRage && currentHealth == 1f)
+        {
+            finalDmg *= 2f;
+        }
+
+        return Mathf.Max(0f, finalDmg);
     }
 
     private float GetEffectiveShotInterval()
@@ -542,6 +652,11 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         }
 
         return activeWeapon.ProjectileSpeed * projSpeedMultiplier;
+    }
+
+    private float GetEffectiveDashCooldown()
+    {
+        return Mathf.Max(0.01f, dashCooldown * dashCooldownMultiplier);
     }
 
     private void TryFireProjectile()
@@ -584,12 +699,33 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         if (projectilePooler == null)
             return;
 
-        GameObject projectileObject = projectilePooler.GetProjectile(aimPivot.position, aimPivot.rotation);
-        if (projectileObject == null)
-            return;
+        float projectileDamage = GetEffectiveDamage();
+        if (nextShotIsCrit)
+        {
+            projectileDamage *= 3f;
+            nextShotIsCrit = false;
+        }
 
-        Vector3 spawnPosition = aimPivot.position;
-        Quaternion spawnRotation = aimPivot.rotation;
+        if (!SpawnConfiguredProjectile(aimPivot.position, aimPivot.rotation, projectileDamage))
+        {
+            return;
+        }
+
+        if (hasSpreadShot)
+        {
+            SpawnConfiguredProjectile(aimPivot.position, aimPivot.rotation * Quaternion.Euler(0f, 0f, 15f), projectileDamage);
+        }
+
+        shotCooldownTimer = GetEffectiveShotInterval();
+    }
+
+    private bool SpawnConfiguredProjectile(Vector3 spawnPosition, Quaternion spawnRotation, float projectileDamage)
+    {
+        GameObject projectileObject = projectilePooler.GetProjectile(spawnPosition, spawnRotation);
+        if (projectileObject == null)
+        {
+            return false;
+        }
 
         projectileObject.transform.SetPositionAndRotation(spawnPosition, spawnRotation);
 
@@ -604,15 +740,16 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         if (!projectileObject.TryGetComponent(out Projectile projectile))
         {
             projectilePooler.ReturnProjectile(projectileObject);
-            return;
+            return false;
         }
 
-        projectile.Setup(GetEffectiveProjectileSpeed(), GetEffectiveDamage());
+        projectile.Setup(GetEffectiveProjectileSpeed(), projectileDamage);
         projectile.isExplosive = activeWeapon.weaponType == WeaponType.Explosive;
+        projectile.isCryo = hasCryoAmmo;
 
         projectileObject.transform.localScale = activeWeapon.weaponType == WeaponType.Explosive
             ? new Vector3(0.025f, 0.025f, 1f)
-            : new Vector3(0.3f, 0.3f, 1f);
+            : new Vector3(0.6f, 0.6f, 1f);
 
         if (activeWeapon.weaponType == WeaponType.Explosive
             && projectile.impactFrames != null
@@ -622,7 +759,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
             projectileSpriteRenderer.sprite = projectile.impactFrames[0];
         }
 
-        shotCooldownTimer = GetEffectiveShotInterval();
+        return true;
     }
 
     private IEnumerator LaserBeamRoutine(float duration)
@@ -755,14 +892,15 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     {
         isInvincible = true;
         float elapsed = 0f;
+        float effectiveInvincibilityDuration = Mathf.Max(0f, invincibilityDuration + extraIframeTime);
         bool faded = false;
 
-        while (elapsed < invincibilityDuration)
+        while (elapsed < effectiveInvincibilityDuration)
         {
             SetBodyAlpha(faded ? 1f : 0.2f);
             faded = !faded;
 
-            float waitDuration = Mathf.Min(InvincibilityFlickerInterval, invincibilityDuration - elapsed);
+            float waitDuration = Mathf.Min(InvincibilityFlickerInterval, effectiveInvincibilityDuration - elapsed);
             yield return new WaitForSeconds(waitDuration);
             elapsed += waitDuration;
         }

@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
@@ -5,6 +6,7 @@ public sealed class EnemyAI : MonoBehaviour
 {
     private static readonly Color ArkanoBaseColor = new(1f, 1f, 1f, 1f);
     private static readonly Color DashWarningColor = new(1f, 0.64705884f, 0f, 1f);
+    private static readonly Color ColdColor = new(0.68f, 0.87f, 1f, 1f);
     private const float DashPreparationDuration = 0.2f;
 
     private enum EnemyState
@@ -39,6 +41,9 @@ public sealed class EnemyAI : MonoBehaviour
     private float dashCooldownTimer;
     private float dashPreparationTimer;
     private float dashTimer;
+    private float baseMoveSpeed;
+    private bool isCold;
+    private Coroutine coldRoutine;
     private Rigidbody2D rigidbody2d;
     private SpriteRenderer spriteRenderer;
 
@@ -47,6 +52,7 @@ public sealed class EnemyAI : MonoBehaviour
         rigidbody2d = GetComponent<Rigidbody2D>();
         enemyHealth = GetComponent<EnemyHealth>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+        baseMoveSpeed = moveSpeed;
     }
 
     private void Start()
@@ -62,6 +68,8 @@ public sealed class EnemyAI : MonoBehaviour
         dashCooldownTimer = 0f;
         dashPreparationTimer = 0f;
         dashTimer = 0f;
+        baseMoveSpeed = moveSpeed;
+        isCold = false;
         lastKnownDirection = Vector2.zero;
         currentState = EnemyState.Idle;
         ResolvePlayerTarget();
@@ -117,6 +125,29 @@ public sealed class EnemyAI : MonoBehaviour
     public void SetTarget(Transform target)
     {
         playerTarget = target;
+    }
+
+    public void ApplyCold()
+    {
+        if (baseMoveSpeed <= 0f)
+        {
+            baseMoveSpeed = moveSpeed;
+        }
+
+        if (!isCold)
+        {
+            moveSpeed = baseMoveSpeed / 1.5f;
+        }
+
+        isCold = true;
+
+        if (coldRoutine != null)
+        {
+            StopCoroutine(coldRoutine);
+        }
+
+        ApplyVisualState();
+        coldRoutine = StartCoroutine(ColdRoutine());
     }
 
     private void SetArkanoBaseColor()
@@ -258,7 +289,7 @@ public sealed class EnemyAI : MonoBehaviour
     {
         Color targetColor = currentState == EnemyState.PreparingDash || currentState == EnemyState.Dashing
             ? DashWarningColor
-            : defaultColor;
+            : (isCold ? ColdColor : defaultColor);
 
         if (enemyHealth != null)
         {
@@ -270,6 +301,16 @@ public sealed class EnemyAI : MonoBehaviour
         {
             spriteRenderer.color = targetColor;
         }
+    }
+
+    private IEnumerator ColdRoutine()
+    {
+        yield return new WaitForSeconds(2f);
+
+        moveSpeed = baseMoveSpeed;
+        isCold = false;
+        coldRoutine = null;
+        ApplyVisualState();
     }
 
     private void OnTriggerEnter2D(Collider2D other)

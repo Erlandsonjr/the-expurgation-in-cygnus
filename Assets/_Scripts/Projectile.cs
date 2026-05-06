@@ -23,8 +23,11 @@ public sealed class Projectile : MonoBehaviour
     private Coroutine impactAnimationRoutine;
     private Sprite defaultSprite;
     private Collider2D[] hitColliders;
+    private Rigidbody2D rb;
+    private bool hasHit;
 
     public bool isExplosive = false;
+    public bool isCryo = false;
     public float explosionRadius = 3f;
     public Sprite[] impactFrames;
     private SpriteRenderer sr;
@@ -40,6 +43,7 @@ public sealed class Projectile : MonoBehaviour
     private void Awake()
     {
         ResolveDefaultLayerMasks();
+        rb = GetComponent<Rigidbody2D>();
         sr = GetComponent<SpriteRenderer>();
         defaultSprite = sr != null ? sr.sprite : null;
         hitColliders = GetComponents<Collider2D>();
@@ -64,6 +68,10 @@ public sealed class Projectile : MonoBehaviour
         damage = Mathf.Max(0f, projectileDamage);
         timer = 0f;
         isExplosive = false;
+        isCryo = false;
+        hasHit = false;
+
+        rb = GetComponent<Rigidbody2D>();
 
         if (sr != null)
         {
@@ -81,6 +89,12 @@ public sealed class Projectile : MonoBehaviour
             }
         }
 
+        if (rb != null)
+        {
+            rb.angularVelocity = 0f;
+            rb.linearVelocity = (Vector2)transform.right * speed;
+        }
+
         gameObject.SetActive(true);
     }
 
@@ -93,8 +107,6 @@ public sealed class Projectile : MonoBehaviour
 
     private void Update()
     {
-        transform.Translate(Vector2.right * speed * Time.deltaTime);
-
         timer += Time.deltaTime;
         if (timer >= lifetime)
         {
@@ -102,11 +114,48 @@ public sealed class Projectile : MonoBehaviour
         }
     }
 
+    private void FixedUpdate()
+    {
+        if (hasHit || speed <= 0f)
+        {
+            return;
+        }
+
+        float moveDistance = speed * Time.fixedDeltaTime;
+        if (moveDistance <= 0f)
+        {
+            return;
+        }
+
+        RaycastHit2D[] hits = Physics2D.RaycastAll(transform.position, transform.right, moveDistance);
+        foreach (RaycastHit2D hit in hits)
+        {
+            if (hit.collider == null || IsOwnedCollider(hit.collider) || !ShouldProcessSweepHit(hit.collider))
+            {
+                continue;
+            }
+
+            OnTriggerEnter2D(hit.collider);
+            break;
+        }
+    }
+
     private void OnTriggerEnter2D(Collider2D collision)
     {
+        if (hasHit || collision == null)
+        {
+            return;
+        }
+
         bool hitsDamageTarget = !string.IsNullOrEmpty(targetTag)
             ? collision.gameObject.CompareTag(targetTag)
             : IsInLayerMask(collision.gameObject.layer, damageLayers);
+        bool hitsGround = IsInLayerMask(collision.gameObject.layer, groundLayers);
+
+        if (!hitsDamageTarget && !hitsGround)
+        {
+            return;
+        }
 
         if (hitsDamageTarget)
         {
@@ -114,10 +163,23 @@ public sealed class Projectile : MonoBehaviour
             {
                 PlayerController player = collision.GetComponentInParent<PlayerController>();
                 if (player != null && player.isDashing) return;
+            }
+
+            hasHit = true;
+
+            if (targetTag == "Player")
+            {
+                PlayerController player = collision.GetComponentInParent<PlayerController>();
                 player?.TakeDamage(damage, transform.position);
             }
             else if (isExplosive)
             {
+                if (isCryo)
+                {
+                    EnemyAI enemyAi = collision.GetComponentInParent<EnemyAI>();
+                    enemyAi?.ApplyCold();
+                }
+
                 Collider2D[] blastHits = Physics2D.OverlapCircleAll(transform.position, explosionRadius);
                 HashSet<IDamageable> damagedTargets = new HashSet<IDamageable>();
 
@@ -139,6 +201,12 @@ public sealed class Projectile : MonoBehaviour
             }
             else
             {
+                if (isCryo)
+                {
+                    EnemyAI enemyAi = collision.GetComponentInParent<EnemyAI>();
+                    enemyAi?.ApplyCold();
+                }
+
                 IDamageable damageable = collision.GetComponentInParent<IDamageable>();
                 damageable?.TakeDamage(damage);
             }
@@ -153,8 +221,10 @@ public sealed class Projectile : MonoBehaviour
             return;
         }
 
-        if (IsInLayerMask(collision.gameObject.layer, groundLayers))
+        if (hitsGround)
         {
+            hasHit = true;
+
             if (isExplosive)
             {
                 StartImpactAnimation();
@@ -178,6 +248,11 @@ public sealed class Projectile : MonoBehaviour
     private IEnumerator PlayImpactAnimation()
     {
         speed = 0f;
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector2.zero;
+        }
 
         if (hitColliders != null)
         {
@@ -209,6 +284,13 @@ public sealed class Projectile : MonoBehaviour
 
     private void Deactivate()
     {
+        hasHit = false;
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector2.zero;
+        }
+
         gameObject.SetActive(false);
         owningPooler?.ReturnProjectile(gameObject);
     }
@@ -232,6 +314,31 @@ public sealed class Projectile : MonoBehaviour
         {
             groundLayers = LayerMask.GetMask("Ground");
         }
+    }
+
+    private bool IsOwnedCollider(Collider2D collider)
+    {
+        if (hitColliders != null)
+        {
+            foreach (Collider2D hitCollider in hitColliders)
+            {
+                if (hitCollider == collider)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return collider.transform == transform || collider.transform.IsChildOf(transform);
+    }
+
+    private bool ShouldProcessSweepHit(Collider2D collider)
+    {
+        bool hitsDamageTarget = !string.IsNullOrEmpty(targetTag)
+            ? collider.gameObject.CompareTag(targetTag)
+            : IsInLayerMask(collider.gameObject.layer, damageLayers);
+
+        return hitsDamageTarget || IsInLayerMask(collider.gameObject.layer, groundLayers);
     }
 
     private static bool IsInLayerMask(int layer, LayerMask layerMask)
