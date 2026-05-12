@@ -5,19 +5,21 @@ using UnityEngine;
 public sealed class AuraDamage : MonoBehaviour
 {
     private static readonly Color AuraVisualColor = new(0f, 1f, 1f, 0.4f);
+    private const string AuraSpritePath = "UI/Skin/Knob.psd";
+    private const string AuraSpriteFallbackPath = "UI/Skin/Background.psd";
 
     [SerializeField] private float damagePerTick = 1f;
     [SerializeField] private float tickInterval = 1f;
 
     private readonly Dictionary<Component, float> lastDamageTimes = new();
     private CircleCollider2D circleCollider;
-    private IDamageable ownerDamageable;
+    private GameObject playerObject;
     private SpriteRenderer spriteRenderer;
 
     private void Awake()
     {
         circleCollider = GetComponent<CircleCollider2D>();
-        ownerDamageable = GetComponentInParent<IDamageable>();
+        playerObject = (GetComponentInParent<IDamageable>() as Component)?.gameObject ?? transform.root.gameObject;
         spriteRenderer = GetComponent<SpriteRenderer>();
 
         if (circleCollider != null)
@@ -51,33 +53,33 @@ public sealed class AuraDamage : MonoBehaviour
 
     private void OnTriggerStay2D(Collider2D col)
     {
-        IDamageable damageable = col.GetComponentInParent<IDamageable>();
-        if (damageable == null || ReferenceEquals(damageable, ownerDamageable))
+        IDamageable target = col.GetComponentInParent<IDamageable>();
+        if (target == null || col.gameObject == playerObject)
         {
             return;
         }
 
-        Component damageableComponent = damageable as Component ?? col.transform;
+        Component targetComponent = target as Component ?? col.transform;
         float currentTime = Time.time;
-        if (lastDamageTimes.TryGetValue(damageableComponent, out float lastDamageTime) && currentTime - lastDamageTime < tickInterval)
+        if (lastDamageTimes.TryGetValue(targetComponent, out float lastDamageTime) && currentTime - lastDamageTime < tickInterval)
         {
             return;
         }
 
-        lastDamageTimes[damageableComponent] = currentTime;
-        damageable.TakeDamage(damagePerTick);
+        lastDamageTimes[targetComponent] = currentTime;
+        target.TakeDamage(damagePerTick);
     }
 
     private void OnTriggerExit2D(Collider2D col)
     {
-        IDamageable damageable = col.GetComponentInParent<IDamageable>();
-        if (damageable == null || ReferenceEquals(damageable, ownerDamageable))
+        IDamageable target = col.GetComponentInParent<IDamageable>();
+        if (target == null || col.gameObject == playerObject)
         {
             return;
         }
 
-        Component damageableComponent = damageable as Component ?? col.transform;
-        lastDamageTimes.Remove(damageableComponent);
+        Component targetComponent = target as Component ?? col.transform;
+        lastDamageTimes.Remove(targetComponent);
     }
 
     private void SyncVisualToCollider()
@@ -87,11 +89,18 @@ public sealed class AuraDamage : MonoBehaviour
             return;
         }
 
-        transform.localScale = Vector3.one * (circleCollider.radius * 2f);
+        transform.localScale = Vector3.one;
 
         if (spriteRenderer != null)
         {
+            spriteRenderer.sprite = LoadAuraSprite() ?? spriteRenderer.sprite;
             spriteRenderer.color = AuraVisualColor;
         }
+    }
+
+    private static Sprite LoadAuraSprite()
+    {
+        return Resources.GetBuiltinResource<Sprite>(AuraSpritePath)
+            ?? Resources.GetBuiltinResource<Sprite>(AuraSpriteFallbackPath);
     }
 }

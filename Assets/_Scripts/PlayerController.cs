@@ -16,7 +16,9 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     private static readonly int AimYParameterHash = Animator.StringToHash("aimY");
     private static readonly int IsDashingParameterHash = Animator.StringToHash("isDashing");
     private const float InvincibilityFlickerInterval = 0.08f;
-    private static readonly Color DashRingVisibleColor = new Color(0f, 1f, 1f, 1f);
+    private static readonly Color DashRingVisibleColor = new Color(1f, 1f, 0.5f, 0.8f);
+    private const string DashRingSpritePath = "UI/Skin/Background.psd";
+    private const string DashRingSpriteFallbackPath = "UI/Skin/UISprite.psd";
 
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 8f;
@@ -893,6 +895,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     {
         RectTransform ringCanvasTransform = null;
         RectTransform ringTransform = null;
+        Sprite dashRingSprite = LoadDashRingSprite();
 
         if (dashCooldownRingImage != null)
         {
@@ -922,11 +925,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
         if (dashCooldownRingImage == null)
         {
-            Sprite ringSprite = radiationAuraVisual != null
-                ? radiationAuraVisual.GetComponent<SpriteRenderer>()?.sprite
-                : null;
-
-            if (ringSprite == null)
+            if (dashRingSprite == null)
             {
                 return;
             }
@@ -940,7 +939,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
             ringTransform.SetParent(ringCanvasTransform, false);
 
             dashCooldownRingImage = ringObject.GetComponent<UnityEngine.UI.Image>();
-            dashCooldownRingImage.sprite = ringSprite;
+            dashCooldownRingImage.sprite = dashRingSprite;
             dashCooldownRingImage.type = UnityEngine.UI.Image.Type.Filled;
             dashCooldownRingImage.fillMethod = UnityEngine.UI.Image.FillMethod.Radial360;
             dashCooldownRingImage.fillOrigin = (int)UnityEngine.UI.Image.Origin360.Top;
@@ -981,9 +980,9 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         ringTransform.anchoredPosition = Vector2.zero;
         ringTransform.sizeDelta = Vector2.zero;
 
-        if (dashCooldownRingImage.sprite == null && radiationAuraVisual != null)
+        if (dashRingSprite != null)
         {
-            dashCooldownRingImage.sprite = radiationAuraVisual.GetComponent<SpriteRenderer>()?.sprite;
+            dashCooldownRingImage.sprite = dashRingSprite;
         }
 
         dashCooldownRingImage.color = DashRingVisibleColor;
@@ -1063,7 +1062,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
         dashReadyFlashPlayed = true;
         dashCooldownRingImage.fillAmount = 1f;
-        dashCooldownRingImage.color = Color.white;
+        dashCooldownRingImage.color = DashRingVisibleColor;
 
         yield return new WaitForSeconds(0.12f);
 
@@ -1071,6 +1070,12 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         hiddenColor.a = 0f;
         dashCooldownRingImage.color = hiddenColor;
         dashRingFlashRoutine = null;
+    }
+
+    private static Sprite LoadDashRingSprite()
+    {
+        return Resources.GetBuiltinResource<Sprite>(DashRingSpritePath)
+            ?? Resources.GetBuiltinResource<Sprite>(DashRingSpriteFallbackPath);
     }
 
     private System.Collections.IEnumerator HideLaserAfterDelay(float delay)

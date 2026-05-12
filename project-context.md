@@ -2,11 +2,11 @@
 
 ## Current Phase
 
-Week 3 - AI & Level 1 Management
+Combat Standardization & Progression Polish
 
 ## Active Task
 
-Scaffolding the Week 5 Upgrade System: ScriptableObject data layer (UpgradeItem), manager logic with ApplyUpgrade, and 3-choice inter-wave UI.
+Maintaining the standardized combat layer, card-rarity progression pool, arena-gated enemies, projectile anti-tunneling, and player feedback visuals.
 
 ## Roadmap Alignment
 
@@ -14,6 +14,14 @@ Scaffolding the Week 5 Upgrade System: ScriptableObject data layer (UpgradeItem)
 
 - Week 1 - Motor Foundations: 100% completed and verified in the Unity Editor.
 - Week 2 - Basilar Combat: completed with held-M1 firing, pooled projectile reuse, and operational weapon-data assets without regressing the completed movement motor.
+
+## Current Architecture Corrections
+
+- Combat is now standardized around `IDamageable` and `IColdAffectable`, so direct projectile hits, cryo application, aura damage, player damage intake, and enemy reactions share a common interface-based contract instead of ad hoc per-enemy hooks.
+- The card pool now lives in `Assets/_ScriptableObjects/Cards/` and uses four authored rarity tiers through `CardRarity`: Common, Uncommon, Rare, and Epic.
+- `EnemyArenaGate` is part of the active enemy stack and clamps enemies to the current camera bounds once they have entered the arena, preventing them from drifting outside the playable view.
+- `Projectile` now performs a forward `Physics2D.CircleCastAll` sweep in `FixedUpdate()` before completing movement, providing the current anti-tunneling pass for fast projectiles.
+- `PlayerController` maintains a World Space Canvas dash ring around the player as the current dash-readiness feedback surface.
 
 ## Requirement Confirmation
 
