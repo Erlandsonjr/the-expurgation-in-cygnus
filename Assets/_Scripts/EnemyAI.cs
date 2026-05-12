@@ -2,7 +2,7 @@ using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
-public sealed class EnemyAI : MonoBehaviour
+public sealed class EnemyAI : MonoBehaviour, IColdAffectable
 {
     private static readonly Color ArkanoBaseColor = new(1f, 1f, 1f, 1f);
     private static readonly Color DashWarningColor = new(1f, 0.64705884f, 0f, 1f);
@@ -136,7 +136,7 @@ public sealed class EnemyAI : MonoBehaviour
 
         if (!isCold)
         {
-            moveSpeed = baseMoveSpeed / 1.5f;
+            moveSpeed = baseMoveSpeed * 0.5f;
         }
 
         isCold = true;

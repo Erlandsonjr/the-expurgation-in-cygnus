@@ -45,9 +45,10 @@ GameObject:
   - component: {fileID: 6036333818625391449}
   - component: {fileID: 8132568757444214582}
   - component: {fileID: 9112544177785365855}
+  - component: {fileID: 9106110189217196560}
   m_Layer: 7
   m_Name: ArkanoSniper
-  m_TagString: Untagged
+  m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -148,6 +149,7 @@ MonoBehaviour:
   horizontalSmoothSpeed: 3
   waveFrequency: 1.5
   waveAmplitude: 1
+  roamSmoothTime: 1.5
   projectilePrefab: {fileID: 5525469342785667999, guid: fc9bd9677c843704f98b89e5e42e6972, type: 3}
   fireRate: 3
   firePoint: {fileID: 745328542842229592}
@@ -214,6 +216,18 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 0.8334442, y: 0.4302039}
   m_EdgeRadius: 0
+--- !u!114 &9106110189217196560
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6737382008436359195}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f0774f0b0062da4ebab22c29b02b223, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyArenaGate
 --- !u!1 &7713491027746489505
 GameObject:
   m_ObjectHideFlags: 0

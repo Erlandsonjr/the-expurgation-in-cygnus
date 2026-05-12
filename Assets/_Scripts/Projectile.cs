@@ -127,7 +127,7 @@ public sealed class Projectile : MonoBehaviour
             return;
         }
 
-        RaycastHit2D[] hits = Physics2D.RaycastAll(transform.position, transform.right, moveDistance);
+        RaycastHit2D[] hits = Physics2D.CircleCastAll(transform.position, 0.5f, transform.right, moveDistance);
         foreach (RaycastHit2D hit in hits)
         {
             if (hit.collider == null || IsOwnedCollider(hit.collider) || !ShouldProcessSweepHit(hit.collider))
@@ -135,6 +135,7 @@ public sealed class Projectile : MonoBehaviour
                 continue;
             }
 
+            transform.position = hit.point;
             OnTriggerEnter2D(hit.collider);
             break;
         }
@@ -167,6 +168,11 @@ public sealed class Projectile : MonoBehaviour
 
             hasHit = true;
 
+            if (isCryo)
+            {
+                ApplyCryoDebuff(collision);
+            }
+
             if (targetTag == "Player")
             {
                 PlayerController player = collision.GetComponentInParent<PlayerController>();
@@ -174,18 +180,16 @@ public sealed class Projectile : MonoBehaviour
             }
             else if (isExplosive)
             {
-                if (isCryo)
-                {
-                    EnemyAI enemyAi = collision.GetComponentInParent<EnemyAI>();
-                    enemyAi?.ApplyCold();
-                }
-
                 Collider2D[] blastHits = Physics2D.OverlapCircleAll(transform.position, explosionRadius);
                 HashSet<IDamageable> damagedTargets = new HashSet<IDamageable>();
 
                 foreach (Collider2D hit in blastHits)
                 {
-                    if (!IsInLayerMask(hit.gameObject.layer, damageLayers) && hit.GetComponentInParent<EnemyHealth>() == null)
+                    bool blastHitsDamageTarget = !string.IsNullOrEmpty(targetTag)
+                        ? hit.gameObject.CompareTag(targetTag)
+                        : IsInLayerMask(hit.gameObject.layer, damageLayers);
+
+                    if (!blastHitsDamageTarget)
                     {
                         continue;
                     }
@@ -201,12 +205,6 @@ public sealed class Projectile : MonoBehaviour
             }
             else
             {
-                if (isCryo)
-                {
-                    EnemyAI enemyAi = collision.GetComponentInParent<EnemyAI>();
-                    enemyAi?.ApplyCold();
-                }
-
                 IDamageable damageable = collision.GetComponentInParent<IDamageable>();
                 damageable?.TakeDamage(damage);
             }
@@ -339,6 +337,15 @@ public sealed class Projectile : MonoBehaviour
             : IsInLayerMask(collider.gameObject.layer, damageLayers);
 
         return hitsDamageTarget || IsInLayerMask(collider.gameObject.layer, groundLayers);
+    }
+
+    private static void ApplyCryoDebuff(Collider2D collision)
+    {
+        IColdAffectable coldAffectable = collision.GetComponentInParent<IColdAffectable>();
+        if (coldAffectable != null)
+        {
+            coldAffectable.ApplyCold();
+        }
     }
 
     private static bool IsInLayerMask(int layer, LayerMask layerMask)

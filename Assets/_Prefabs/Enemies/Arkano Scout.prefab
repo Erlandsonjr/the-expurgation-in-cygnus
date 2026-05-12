@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 5791829234097067709}
   - component: {fileID: -6389594717318719292}
   - component: {fileID: 4931160279707328821}
+  - component: {fileID: 1122334455667788990}
   - component: {fileID: 8902083984258869281}
   m_Layer: 7
   m_Name: Arkano Scout
@@ -159,6 +160,18 @@ MonoBehaviour:
   flashDuration: 0.1
   flashColor: {r: 1, g: 0.25, b: 0.25, a: 1}
   spriteRenderer: {fileID: 6910690918036553661}
+--- !u!114 &1122334455667788990
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8333980675913137187}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f0774f0b0062da4ebab22c29b02b223, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyArenaGate
 --- !u!58 &8902083984258869281
 CircleCollider2D:
   m_ObjectHideFlags: 0

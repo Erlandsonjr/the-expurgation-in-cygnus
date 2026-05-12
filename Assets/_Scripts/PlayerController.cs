@@ -16,6 +16,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     private static readonly int AimYParameterHash = Animator.StringToHash("aimY");
     private static readonly int IsDashingParameterHash = Animator.StringToHash("isDashing");
     private const float InvincibilityFlickerInterval = 0.08f;
+    private static readonly Color DashRingVisibleColor = new Color(0f, 1f, 1f, 1f);
 
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 8f;
@@ -81,9 +82,11 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     [SerializeField] public Sprite[] healthSprites;
     [SerializeField] public UnityEngine.UI.Image healthBarImage;
     [SerializeField] public UnityEngine.UI.Image dashCooldownFill;
+    [SerializeField] private UnityEngine.UI.Image dashCooldownRingImage;
 
     [Header("Laser")]
     public LineRenderer laserLine;
+    [SerializeField] private LineRenderer spreadLaserLine;
     public GameObject continuousLaserVisual;
     public GameObject radiationAuraVisual;
 
@@ -102,6 +105,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     private float shotCooldownTimer;
     private bool isFiringLaser;
     private bool hasCritAfterDashUpgrade;
+    private bool dashReadyFlashPlayed;
     private bool isInvincible;
     private bool isDead;
     private Vector2 moveInput;
@@ -110,6 +114,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     private Vector2 lastAimWorldPosition;
     private float lastDashTime = -10f;
     public bool isDashing = false;
+    private Coroutine dashRingFlashRoutine;
 
     public event Action<float, float> HealthChanged;
 
@@ -174,6 +179,11 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
             continuousLaserVisual = aimPivot.Find("LaserBeamVisual")?.gameObject;
         }
 
+        if (spreadLaserLine == null && aimPivot != null)
+        {
+            spreadLaserLine = aimPivot.Find("LaserBeamVisual_Spread")?.GetComponent<LineRenderer>();
+        }
+
         if (radiationAuraVisual == null)
         {
             radiationAuraVisual = transform.Find("RadiationAuraVisual")?.gameObject;
@@ -183,6 +193,8 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         {
             laserLine = continuousLaserVisual.GetComponent<LineRenderer>();
         }
+
+        EnsureDashCooldownRing();
 
         maxHealth = maxHealth > 0f ? maxHealth : 5f;
         invincibilityDuration = Mathf.Max(0f, invincibilityDuration);
@@ -419,28 +431,20 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
     private void UpdateDashCooldownUI()
     {
-        if (dashCooldownFill == null)
+        float fillAmount = 0f;
+
+        if (!isDashing)
         {
-            Transform dashFillTransform = GameObject.Find("Canvas")?.transform.Find("DashCooldownBar/Fill");
-            if (dashFillTransform != null)
-            {
-                dashCooldownFill = dashFillTransform.GetComponent<UnityEngine.UI.Image>();
-            }
+            float timeSinceDash = Time.time - lastDashTime;
+            fillAmount = Mathf.Clamp01(timeSinceDash / GetEffectiveDashCooldown());
         }
 
         if (dashCooldownFill != null)
         {
-            if (isDashing)
-            {
-                dashCooldownFill.fillAmount = 0f;
-            }
-            else
-            {
-                float timeSinceDash = Time.time - lastDashTime;
-                float currentCooldown = GetEffectiveDashCooldown();
-                dashCooldownFill.fillAmount = Mathf.Clamp01(timeSinceDash / currentCooldown);
-            }
+            dashCooldownFill.fillAmount = fillAmount;
         }
+
+        UpdateDashCooldownRing(fillAmount);
     }
 
     private IEnumerator DashRoutine()
@@ -452,6 +456,11 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
             foreach (Collider2D hit in blastHits)
             {
                 IDamageable damageable = hit.GetComponentInParent<IDamageable>();
+                if (damageable == null || ReferenceEquals(damageable, this))
+                {
+                    continue;
+                }
+
                 if (damageable != null && damagedTargets.Add(damageable))
                 {
                     damageable.TakeDamage(3f);
@@ -461,6 +470,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
         isDashing = true;
         if (dashCooldownFill != null) dashCooldownFill.fillAmount = 0f;
+        ResetDashCooldownRing();
         if (bodySpriteRenderer != null)
             bodySpriteRenderer.color = new Color(1f, 1f, 1f, 0.5f);
 
@@ -477,12 +487,13 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         isDashing = false;
         if (bodySpriteRenderer != null)
             bodySpriteRenderer.color = bodyDefaultColor;
-        lastDashTime = Time.time;
 
         if (hasCritAfterDashUpgrade)
         {
             nextShotIsCrit = true;
         }
+
+        lastDashTime = Time.time;
     }
 
     /// <summary>Equips a new weapon, updating stats and the visual sprite immediately.</summary>
@@ -625,7 +636,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
             return 0f;
         }
 
-        float finalDmg = (activeWeapon.Damage * damageMultiplier) + flatDamageBonus;
+        float finalDmg = (activeWeapon.Damage + flatDamageBonus) * damageMultiplier;
         if (hasBerserkerRage && currentHealth == 1f)
         {
             finalDmg *= 2f;
@@ -775,6 +786,13 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
         continuousLaserVisual.SetActive(true);
         laserLine.enabled = true;
+        EnsureSpreadLaserLine();
+
+        if (spreadLaserLine != null)
+        {
+            spreadLaserLine.gameObject.SetActive(hasSpreadShot);
+            spreadLaserLine.enabled = hasSpreadShot;
+        }
 
         float elapsed = 0f;
 
@@ -786,21 +804,19 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
             }
 
             Vector3 origin = aimPivot.position;
-            Vector3 endPoint = origin + aimPivot.right * 30f;
-            laserLine.SetPosition(0, origin);
-            laserLine.SetPosition(1, endPoint);
+            float totalDmg = GetEffectiveDamage();
+            float damagePerFrame = totalDmg * Time.deltaTime;
+            ProcessLaserBeam(origin, aimPivot.right, laserLine, damagePerFrame);
 
-            RaycastHit2D[] hits = Physics2D.RaycastAll(origin, aimPivot.right, 30f, LayerMask.GetMask("Enemy"));
-            float damagePerFrame = GetEffectiveDamage() * Time.deltaTime;
-            HashSet<IDamageable> damagedTargets = new HashSet<IDamageable>();
-
-            foreach (RaycastHit2D hit in hits)
+            if (hasSpreadShot && spreadLaserLine != null)
             {
-                IDamageable damageable = hit.collider.GetComponentInParent<IDamageable>();
-                if (damageable != null && damagedTargets.Add(damageable))
-                {
-                    damageable.TakeDamage(damagePerFrame);
-                }
+                Vector2 spreadDirection = Quaternion.Euler(0f, 0f, 15f) * aimPivot.right;
+                ProcessLaserBeam(origin, spreadDirection, spreadLaserLine, damagePerFrame);
+            }
+            else if (spreadLaserLine != null)
+            {
+                spreadLaserLine.enabled = false;
+                spreadLaserLine.gameObject.SetActive(false);
             }
 
             elapsed += Time.deltaTime;
@@ -817,8 +833,244 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
             laserLine.enabled = false;
         }
 
+        if (spreadLaserLine != null)
+        {
+            spreadLaserLine.enabled = false;
+            spreadLaserLine.gameObject.SetActive(false);
+        }
+
         isFiringLaser = false;
         continuousLaserRoutine = null;
+    }
+
+    private void ProcessLaserBeam(Vector3 origin, Vector2 direction, LineRenderer targetLine, float damagePerFrame)
+    {
+        if (targetLine == null)
+        {
+            return;
+        }
+
+        Vector2 normalizedDirection = direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector2.right;
+        Vector3 endPoint = origin + (Vector3)(normalizedDirection * 30f);
+
+        targetLine.gameObject.SetActive(true);
+        targetLine.enabled = true;
+        targetLine.SetPosition(0, origin);
+        targetLine.SetPosition(1, endPoint);
+
+        RaycastHit2D[] hits = Physics2D.RaycastAll(origin, normalizedDirection, 30f, LayerMask.GetMask("Enemy"));
+        HashSet<IDamageable> damagedTargets = new HashSet<IDamageable>();
+
+        foreach (RaycastHit2D hit in hits)
+        {
+            if (hasCryoAmmo)
+            {
+                hit.collider.GetComponentInParent<IColdAffectable>()?.ApplyCold();
+            }
+
+            IDamageable damageable = hit.collider.GetComponentInParent<IDamageable>();
+            if (damageable != null && damagedTargets.Add(damageable))
+            {
+                damageable.TakeDamage(damagePerFrame);
+            }
+        }
+    }
+
+    private void EnsureSpreadLaserLine()
+    {
+        if (spreadLaserLine != null || laserLine == null)
+        {
+            return;
+        }
+
+        spreadLaserLine = Instantiate(laserLine, laserLine.transform.parent);
+        spreadLaserLine.gameObject.name = "LaserBeamVisual_Spread";
+        spreadLaserLine.enabled = false;
+        spreadLaserLine.gameObject.SetActive(false);
+    }
+
+    private void EnsureDashCooldownRing()
+    {
+        RectTransform ringCanvasTransform = null;
+        RectTransform ringTransform = null;
+
+        if (dashCooldownRingImage != null)
+        {
+            ringTransform = dashCooldownRingImage.rectTransform;
+            ringCanvasTransform = dashCooldownRingImage.canvas != null
+                ? dashCooldownRingImage.canvas.GetComponent<RectTransform>()
+                : dashCooldownRingImage.transform.parent as RectTransform;
+
+            if (ringCanvasTransform == null || ringTransform == null)
+            {
+                dashCooldownRingImage = null;
+            }
+        }
+
+        if (dashCooldownRingImage == null)
+        {
+            Transform existingRing = transform.Find("DashRingCanvas/DashCooldownRing")
+                ?? transform.Find("DashCooldownRingCanvas/DashCooldownRing");
+
+            if (existingRing != null)
+            {
+                dashCooldownRingImage = existingRing.GetComponent<UnityEngine.UI.Image>();
+                ringTransform = existingRing as RectTransform;
+                ringCanvasTransform = existingRing.parent as RectTransform;
+            }
+        }
+
+        if (dashCooldownRingImage == null)
+        {
+            Sprite ringSprite = radiationAuraVisual != null
+                ? radiationAuraVisual.GetComponent<SpriteRenderer>()?.sprite
+                : null;
+
+            if (ringSprite == null)
+            {
+                return;
+            }
+
+            GameObject canvasGO = new GameObject("DashRingCanvas", typeof(RectTransform), typeof(Canvas));
+            ringCanvasTransform = canvasGO.GetComponent<RectTransform>();
+            ringCanvasTransform.SetParent(transform, false);
+
+            GameObject ringObject = new GameObject("DashCooldownRing", typeof(RectTransform), typeof(CanvasRenderer), typeof(UnityEngine.UI.Image));
+            ringTransform = ringObject.GetComponent<RectTransform>();
+            ringTransform.SetParent(ringCanvasTransform, false);
+
+            dashCooldownRingImage = ringObject.GetComponent<UnityEngine.UI.Image>();
+            dashCooldownRingImage.sprite = ringSprite;
+            dashCooldownRingImage.type = UnityEngine.UI.Image.Type.Filled;
+            dashCooldownRingImage.fillMethod = UnityEngine.UI.Image.FillMethod.Radial360;
+            dashCooldownRingImage.fillOrigin = (int)UnityEngine.UI.Image.Origin360.Top;
+            dashCooldownRingImage.fillClockwise = false;
+            dashCooldownRingImage.preserveAspect = true;
+            dashCooldownRingImage.raycastTarget = false;
+        }
+
+        if (ringCanvasTransform == null || ringTransform == null)
+        {
+            return;
+        }
+
+        ringCanvasTransform.name = "DashRingCanvas";
+        ringCanvasTransform.SetParent(transform, false);
+        ringCanvasTransform.localPosition = new Vector3(0f, -0.6f, 0f);
+        ringCanvasTransform.localRotation = Quaternion.identity;
+        ringCanvasTransform.localScale = Vector3.one;
+        ringCanvasTransform.sizeDelta = new Vector2(2f, 2f);
+
+        Canvas ringCanvas = ringCanvasTransform.GetComponent<Canvas>();
+        if (ringCanvas == null)
+        {
+            ringCanvas = ringCanvasTransform.gameObject.AddComponent<Canvas>();
+        }
+
+        ringCanvas.renderMode = RenderMode.WorldSpace;
+        ringCanvas.overrideSorting = true;
+        ringCanvas.sortingOrder = 50;
+
+        ringTransform.SetParent(ringCanvasTransform, false);
+        ringTransform.anchorMin = Vector2.zero;
+        ringTransform.anchorMax = Vector2.one;
+        ringTransform.offsetMin = Vector2.zero;
+        ringTransform.offsetMax = Vector2.zero;
+        ringTransform.localScale = Vector3.one;
+        ringTransform.localRotation = Quaternion.identity;
+        ringTransform.anchoredPosition = Vector2.zero;
+        ringTransform.sizeDelta = Vector2.zero;
+
+        if (dashCooldownRingImage.sprite == null && radiationAuraVisual != null)
+        {
+            dashCooldownRingImage.sprite = radiationAuraVisual.GetComponent<SpriteRenderer>()?.sprite;
+        }
+
+        dashCooldownRingImage.color = DashRingVisibleColor;
+        dashCooldownRingImage.fillAmount = Mathf.Clamp01(dashCooldownRingImage.fillAmount);
+    }
+
+    private void UpdateDashCooldownRing(float fillAmount)
+    {
+        EnsureDashCooldownRing();
+
+        if (dashCooldownRingImage == null)
+        {
+            return;
+        }
+
+        if (isDashing)
+        {
+            ResetDashCooldownRing();
+            return;
+        }
+
+        dashCooldownRingImage.fillAmount = fillAmount;
+
+        if (fillAmount < 0.999f)
+        {
+            if (dashRingFlashRoutine != null)
+            {
+                StopCoroutine(dashRingFlashRoutine);
+                dashRingFlashRoutine = null;
+            }
+
+            dashReadyFlashPlayed = false;
+            dashCooldownRingImage.color = DashRingVisibleColor;
+            return;
+        }
+
+        if (!dashReadyFlashPlayed && dashRingFlashRoutine == null)
+        {
+            dashRingFlashRoutine = StartCoroutine(FlashDashReadyRing());
+            return;
+        }
+
+        if (dashReadyFlashPlayed && dashRingFlashRoutine == null)
+        {
+            Color hiddenColor = DashRingVisibleColor;
+            hiddenColor.a = 0f;
+            dashCooldownRingImage.color = hiddenColor;
+        }
+    }
+
+    private void ResetDashCooldownRing()
+    {
+        if (dashRingFlashRoutine != null)
+        {
+            StopCoroutine(dashRingFlashRoutine);
+            dashRingFlashRoutine = null;
+        }
+
+        dashReadyFlashPlayed = false;
+
+        if (dashCooldownRingImage == null)
+        {
+            return;
+        }
+
+        dashCooldownRingImage.fillAmount = 0f;
+        dashCooldownRingImage.color = DashRingVisibleColor;
+    }
+
+    private IEnumerator FlashDashReadyRing()
+    {
+        if (dashCooldownRingImage == null)
+        {
+            dashRingFlashRoutine = null;
+            yield break;
+        }
+
+        dashReadyFlashPlayed = true;
+        dashCooldownRingImage.fillAmount = 1f;
+        dashCooldownRingImage.color = Color.white;
+
+        yield return new WaitForSeconds(0.12f);
+
+        Color hiddenColor = DashRingVisibleColor;
+        hiddenColor.a = 0f;
+        dashCooldownRingImage.color = hiddenColor;
+        dashRingFlashRoutine = null;
     }
 
     private System.Collections.IEnumerator HideLaserAfterDelay(float delay)

@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -6,8 +7,11 @@ using UnityEngine;
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(Rigidbody2D))]
-public sealed class ArkanoSniperAI : MonoBehaviour
+public sealed class ArkanoSniperAI : MonoBehaviour, IColdAffectable
 {
+    private static readonly Color ColdColor = new(0.68f, 0.87f, 1f, 1f);
+    private const float ColdSlowMultiplier = 0.5f;
+
     [Header("Targeting")]
     [SerializeField] private Transform playerTarget;
 
@@ -15,6 +19,7 @@ public sealed class ArkanoSniperAI : MonoBehaviour
     [SerializeField] private float horizontalSmoothSpeed = 2f;
     [SerializeField] private float waveFrequency = 1.5f;
     [SerializeField] private float waveAmplitude = 1.0f;
+    [SerializeField] private float roamSmoothTime = 1.5f;
 
     // Per-instance randomized values — set in Start() so each sniper is unique.
     private float individualYOffset;
@@ -34,6 +39,13 @@ public sealed class ArkanoSniperAI : MonoBehaviour
     [SerializeField] private float sniperDamage = 1f;
 
     private Rigidbody2D rb;
+    private EnemyHealth enemyHealth;
+    private SpriteRenderer spriteRenderer;
+    private Color defaultColor = Color.white;
+    private float baseHorizontalSmoothSpeed;
+    private float baseRoamSmoothTime;
+    private bool isCold;
+    private Coroutine coldRoutine;
     // Counts down to zero; fires when it reaches 0 and resets to fireRate.
     private float fireTimer;
 
@@ -42,6 +54,20 @@ public sealed class ArkanoSniperAI : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         rb.gravityScale = 0f;
         rb.constraints = RigidbodyConstraints2D.FreezeRotation;
+        enemyHealth = GetComponent<EnemyHealth>();
+        spriteRenderer = GetComponent<SpriteRenderer>() ?? GetComponentInChildren<SpriteRenderer>();
+        defaultColor = spriteRenderer != null ? spriteRenderer.color : Color.white;
+        baseHorizontalSmoothSpeed = horizontalSmoothSpeed;
+        baseRoamSmoothTime = roamSmoothTime;
+    }
+
+    private void OnEnable()
+    {
+        horizontalSmoothSpeed = baseHorizontalSmoothSpeed > 0f ? baseHorizontalSmoothSpeed : horizontalSmoothSpeed;
+        roamSmoothTime = baseRoamSmoothTime > 0f ? baseRoamSmoothTime : roamSmoothTime;
+        isCold = false;
+        coldRoutine = null;
+        ApplyVisualState();
     }
 
     private void Start()
@@ -72,6 +98,35 @@ public sealed class ArkanoSniperAI : MonoBehaviour
     public void SetTarget(Transform target)
     {
         playerTarget = target;
+    }
+
+    public void ApplyCold()
+    {
+        if (baseHorizontalSmoothSpeed <= 0f)
+        {
+            baseHorizontalSmoothSpeed = horizontalSmoothSpeed;
+        }
+
+        if (baseRoamSmoothTime <= 0f)
+        {
+            baseRoamSmoothTime = roamSmoothTime;
+        }
+
+        if (!isCold)
+        {
+            horizontalSmoothSpeed = baseHorizontalSmoothSpeed * ColdSlowMultiplier;
+            roamSmoothTime = baseRoamSmoothTime / ColdSlowMultiplier;
+        }
+
+        isCold = true;
+
+        if (coldRoutine != null)
+        {
+            StopCoroutine(coldRoutine);
+        }
+
+        ApplyVisualState();
+        coldRoutine = StartCoroutine(ColdRoutine());
     }
 
     private void Update()
@@ -105,7 +160,7 @@ public sealed class ArkanoSniperAI : MonoBehaviour
             roamTimer      = roamInterval;
         }
         float targetX = playerTarget.position.x + currentXOffset;
-        float newX    = Mathf.SmoothDamp(rb.position.x, targetX, ref xVelocity, 1.5f);
+        float newX    = Mathf.SmoothDamp(rb.position.x, targetX, ref xVelocity, roamSmoothTime);
 
         // Y: base hover height + sinusoidal oscillation with per-instance phase offset.
         sinWaveTimer += Time.fixedDeltaTime;
@@ -114,6 +169,33 @@ public sealed class ArkanoSniperAI : MonoBehaviour
         float newY = Mathf.Lerp(rb.position.y, targetY, horizontalSmoothSpeed * Time.fixedDeltaTime);
 
         rb.MovePosition(new Vector2(newX, newY));
+    }
+
+    private void ApplyVisualState()
+    {
+        Color targetColor = isCold ? ColdColor : defaultColor;
+
+        if (enemyHealth != null)
+        {
+            enemyHealth.SetBaseColor(targetColor);
+            return;
+        }
+
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = targetColor;
+        }
+    }
+
+    private IEnumerator ColdRoutine()
+    {
+        yield return new WaitForSeconds(2f);
+
+        horizontalSmoothSpeed = baseHorizontalSmoothSpeed;
+        roamSmoothTime = baseRoamSmoothTime;
+        isCold = false;
+        coldRoutine = null;
+        ApplyVisualState();
     }
 
     private void FireProjectile()
