@@ -1,0 +1,531 @@
+fileFormatVersion: 2
+guid: e2599572f96b52b4aa568b78415ef7cb
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -3558495015784052242
+    second: arrow_explosion_0
+  - first:
+      213: 7297071982271646098
+    second: arrow_explosion_1
+  - first:
+      213: 6909970355391142710
+    second: arrow_explosion_2
+  - first:
+      213: 4151189897247681556
+    second: arrow_explosion_3
+  - first:
+      213: 4908679818743953125
+    second: arrow_explosion_4
+  - first:
+      213: -4196963450986758419
+    second: arrow_explosion_5
+  - first:
+      213: 5447962211592290651
+    second: arrow_explosion_6
+  - first:
+      213: 6017861126114343079
+    second: arrow_explosion_7
+  - first:
+      213: 7313054923656947894
+    second: arrow_explosion_8
+  - first:
+      213: 8695234603732253624
+    second: arrow_explosion_9
+  - first:
+      213: -5019154754228182531
+    second: arrow_explosion_10
+  - first:
+      213: -7001908224654017370
+    second: arrow_explosion_11
+  - first:
+      213: -407639916626899184
+    second: arrow_explosion_12
+  - first:
+      213: 5611652369467803348
+    second: arrow_explosion_13
+  - first:
+      213: 5171161792834413340
+    second: arrow_explosion_14
+  - first:
+      213: 5418068606620840151
+    second: arrow_explosion_15
+  - first:
+      213: 2781379514921726590
+    second: arrow_explosion_16
+  - first:
+      213: 1531110504740545339
+    second: arrow_explosion_17
+  - first:
+      213: 3364655944954694108
+    second: arrow_explosion_18
+  - first:
+      213: -9095427449259060467
+    second: arrow_explosion_19
+  - first:
+      213: -7899136052374204394
+    second: arrow_explosion_20
+  - first:
+      213: -7292712516550533724
+    second: arrow_explosion_21
+  - first:
+      213: -3444391689726746964
+    second: arrow_explosion_22
+  - first:
+      213: -6924747265995150008
+    second: arrow_explosion_23
+  - first:
+      213: 7860729692931569359
+    second: arrow_explosion_24
+  - first:
+      213: 1160111056242231837
+    second: arrow_explosion_25
+  - first:
+      213: 6288281670800621088
+    second: arrow_explosion_26
+  - first:
+      213: -6116433594062248111
+    second: arrow_explosion_27
+  - first:
+      213: 8106761540674305269
+    second: arrow_explosion_28
+  - first:
+      213: -6265017003371932652
+    second: arrow_explosion_29
+  - first:
+      213: -4315741425146200823
+    second: arrow_explosion_30
+  - first:
+      213: -5385061370770939234
+    second: arrow_explosion_31
+  - first:
+      213: -2706100874779564033
+    second: arrow_explosion_32
+  - first:
+      213: -8174405258285844731
+    second: arrow_explosion_33
+  - first:
+      213: 1977718903860350106
+    second: arrow_explosion_34
+  - first:
+      213: 3585383779211161922
+    second: arrow_explosion_35
+  - first:
+      213: -3597347650235905858
+    second: arrow_explosion_36
+  - first:
+      213: 1119342457654753682
+    second: arrow_explosion_37
+  - first:
+      213: -3348882497422324407
+    second: arrow_explosion_38
+  - first:
+      213: 631612025574647662
+    second: arrow_explosion_39
+  - first:
+      213: -471206797939700396
+    second: arrow_explosion_40
+  - first:
+      213: 951344580123687684
+    second: arrow_explosion_41
+  - first:
+      213: -1784086330339642332
+    second: arrow_explosion_42
+  - first:
+      213: 332694049364960124
+    second: arrow_explosion_43
+  - first:
+      213: -7828442737973618489
+    second: arrow_explosion_44
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: arrow_explosion_0
+      rect:
+        serializedVersion: 2
+        x: 13
+        y: 11
+        width: 39
+        height: 40
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ee9813903afad9ec0800000000000000
+      internalID: -3558495015784052242
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: arrow_explosion_1
+      rect:
+        serializedVersion: 2
+        x: 67
+        y: 2
+        width: 59
+        height: 60
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 299c1cb6e48644560800000000000000
+      internalID: 7297071982271646098
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: arrow_explosion_2
+      rect:
+        serializedVersion: 2
+        x: 131
+        y: 2
+        width: 59
+        height: 60
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 63b91997d6525ef50800000000000000
+      internalID: 6909970355391142710
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: arrow_explosion_3
+      rect:
+        serializedVersion: 2
+        x: 195
+        y: 2
+        width: 59
+        height: 60
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 41c63a4b73dfb9930800000000000000
+      internalID: 4151189897247681556
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: arrow_explosion_4
+      rect:
+        serializedVersion: 2
+        x: 259
+        y: 2
+        width: 59
+        height: 60
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5e6bc50b9422f1440800000000000000
+      internalID: 4908679818743953125
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: arrow_explosion_5
+      rect:
+        serializedVersion: 2
+        x: 323
+        y: 2
+        width: 60
+        height: 60
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: deef2a05af361c5c0800000000000000
+      internalID: -4196963450986758419
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: arrow_explosion_6
+      rect:
+        serializedVersion: 2
+        x: 387
+        y: 2
+        width: 59
+        height: 60
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b51c5b354cc0b9b40800000000000000
+      internalID: 5447962211592290651
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: arrow_explosion_7
+      rect:
+        serializedVersion: 2
+        x: 448
+        y: 2
+        width: 62
+        height: 59
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7a87da96fccb38350800000000000000
+      internalID: 6017861126114343079
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: arrow_explosion_8
+      rect:
+        serializedVersion: 2
+        x: 512
+        y: 2
+        width: 65
+        height: 60
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6b86e73f4b03d7560800000000000000
+      internalID: 7313054923656947894
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: arrow_explosion_9
+      rect:
+        serializedVersion: 2
+        x: 579
+        y: 2
+        width: 58
+        height: 60
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8bb35228dcdaba870800000000000000
+      internalID: 8695234603732253624
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: e95a342a0b490034c8b24cab6e97d4a6
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      arrow_explosion_0: -3558495015784052242
+      arrow_explosion_1: 7297071982271646098
+      arrow_explosion_10: -5019154754228182531
+      arrow_explosion_11: -7001908224654017370
+      arrow_explosion_12: -407639916626899184
+      arrow_explosion_13: 5611652369467803348
+      arrow_explosion_14: 5171161792834413340
+      arrow_explosion_15: 5418068606620840151
+      arrow_explosion_16: 2781379514921726590
+      arrow_explosion_17: 1531110504740545339
+      arrow_explosion_18: 3364655944954694108
+      arrow_explosion_19: -9095427449259060467
+      arrow_explosion_2: 6909970355391142710
+      arrow_explosion_20: -7899136052374204394
+      arrow_explosion_21: -7292712516550533724
+      arrow_explosion_22: -3444391689726746964
+      arrow_explosion_23: -6924747265995150008
+      arrow_explosion_24: 7860729692931569359
+      arrow_explosion_25: 1160111056242231837
+      arrow_explosion_26: 6288281670800621088
+      arrow_explosion_27: -6116433594062248111
+      arrow_explosion_28: 8106761540674305269
+      arrow_explosion_29: -6265017003371932652
+      arrow_explosion_3: 4151189897247681556
+      arrow_explosion_30: -4315741425146200823
+      arrow_explosion_31: -5385061370770939234
+      arrow_explosion_32: -2706100874779564033
+      arrow_explosion_33: -8174405258285844731
+      arrow_explosion_34: 1977718903860350106
+      arrow_explosion_35: 3585383779211161922
+      arrow_explosion_36: -3597347650235905858
+      arrow_explosion_37: 1119342457654753682
+      arrow_explosion_38: -3348882497422324407
+      arrow_explosion_39: 631612025574647662
+      arrow_explosion_4: 4908679818743953125
+      arrow_explosion_40: -471206797939700396
+      arrow_explosion_41: 951344580123687684
+      arrow_explosion_42: -1784086330339642332
+      arrow_explosion_43: 332694049364960124
+      arrow_explosion_44: -7828442737973618489
+      arrow_explosion_45: -1039098514
+      arrow_explosion_5: -4196963450986758419
+      arrow_explosion_6: 5447962211592290651
+      arrow_explosion_7: 6017861126114343079
+      arrow_explosion_8: 7313054923656947894
+      arrow_explosion_9: 8695234603732253624
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

@@ -4,23 +4,17 @@ using UnityEngine;
 [RequireComponent(typeof(CircleCollider2D))]
 public sealed class AuraDamage : MonoBehaviour
 {
-    private static readonly Color AuraVisualColor = new(0f, 1f, 1f, 0.4f);
-    private const string AuraSpritePath = "UI/Skin/Knob.psd";
-    private const string AuraSpriteFallbackPath = "UI/Skin/Background.psd";
-
     [SerializeField] private float damagePerTick = 1f;
     [SerializeField] private float tickInterval = 1f;
 
     private readonly Dictionary<Component, float> lastDamageTimes = new();
     private CircleCollider2D circleCollider;
     private GameObject playerObject;
-    private SpriteRenderer spriteRenderer;
 
     private void Awake()
     {
         circleCollider = GetComponent<CircleCollider2D>();
         playerObject = (GetComponentInParent<IDamageable>() as Component)?.gameObject ?? transform.root.gameObject;
-        spriteRenderer = GetComponent<SpriteRenderer>();
 
         if (circleCollider != null)
         {
@@ -36,7 +30,6 @@ public sealed class AuraDamage : MonoBehaviour
         tickInterval = Mathf.Max(0.01f, tickInterval);
 
         circleCollider = GetComponent<CircleCollider2D>();
-        spriteRenderer = GetComponent<SpriteRenderer>();
 
         if (circleCollider != null)
         {
@@ -84,23 +77,18 @@ public sealed class AuraDamage : MonoBehaviour
 
     private void SyncVisualToCollider()
     {
-        if (circleCollider == null)
+        SpriteRenderer sr = GetComponent<SpriteRenderer>();
+        CircleCollider2D col = GetComponent<CircleCollider2D>();
+
+        if (sr != null && col != null)
         {
-            return;
+            transform.localScale = new Vector3(35f, 35f, 1f);
+
+            float targetWorldRadius = 2.5f;
+            col.radius = targetWorldRadius / 35f;
+
+            sr.color = new Color(0f, 1f, 1f, 0.08f);
+            sr.sortingOrder = -2;
         }
-
-        transform.localScale = Vector3.one;
-
-        if (spriteRenderer != null)
-        {
-            spriteRenderer.sprite = LoadAuraSprite() ?? spriteRenderer.sprite;
-            spriteRenderer.color = AuraVisualColor;
-        }
-    }
-
-    private static Sprite LoadAuraSprite()
-    {
-        return Resources.GetBuiltinResource<Sprite>(AuraSpritePath)
-            ?? Resources.GetBuiltinResource<Sprite>(AuraSpriteFallbackPath);
     }
 }

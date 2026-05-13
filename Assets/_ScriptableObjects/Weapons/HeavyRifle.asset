@@ -15,5 +15,5 @@ MonoBehaviour:
   weaponName: HeavyRifle
   weaponSprite: {fileID: 21300000, guid: 7758af16c3c10824e8306f743285dc39, type: 3}
   damage: 1
-  fireRate: 10
+  fireRate: 5
   projectileSpeed: 18

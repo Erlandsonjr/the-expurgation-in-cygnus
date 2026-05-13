@@ -25,11 +25,13 @@ public sealed class Projectile : MonoBehaviour
     private Collider2D[] hitColliders;
     private Rigidbody2D rb;
     private bool hasHit;
+    private Vector3 defaultLocalScale;
 
     public bool isExplosive = false;
     public bool isCryo = false;
     public float explosionRadius = 3f;
     public Sprite[] impactFrames;
+    public Sprite[] explosionFrames;
     private SpriteRenderer sr;
 
     /// <summary>Serialized default speed; readable by external spawners before Setup is called.</summary>
@@ -46,6 +48,7 @@ public sealed class Projectile : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         sr = GetComponent<SpriteRenderer>();
         defaultSprite = sr != null ? sr.sprite : null;
+        defaultLocalScale = transform.localScale;
         hitColliders = GetComponents<Collider2D>();
 
         // Safety net: if this prefab is instantiated without Setup() being called,
@@ -77,6 +80,8 @@ public sealed class Projectile : MonoBehaviour
         {
             sr.sprite = defaultSprite;
         }
+
+        transform.localScale = defaultLocalScale;
 
         if (hitColliders != null)
         {
@@ -151,7 +156,7 @@ public sealed class Projectile : MonoBehaviour
         bool hitsDamageTarget = !string.IsNullOrEmpty(targetTag)
             ? collision.gameObject.CompareTag(targetTag)
             : IsInLayerMask(collision.gameObject.layer, damageLayers);
-        bool hitsGround = IsInLayerMask(collision.gameObject.layer, groundLayers);
+        bool hitsGround = IsWorldGeometry(collision);
 
         if (!hitsDamageTarget && !hitsGround)
         {
@@ -180,39 +185,13 @@ public sealed class Projectile : MonoBehaviour
             }
             else if (isExplosive)
             {
-                Collider2D[] blastHits = Physics2D.OverlapCircleAll(transform.position, explosionRadius);
-                HashSet<IDamageable> damagedTargets = new HashSet<IDamageable>();
-
-                foreach (Collider2D hit in blastHits)
-                {
-                    bool blastHitsDamageTarget = !string.IsNullOrEmpty(targetTag)
-                        ? hit.gameObject.CompareTag(targetTag)
-                        : IsInLayerMask(hit.gameObject.layer, damageLayers);
-
-                    if (!blastHitsDamageTarget)
-                    {
-                        continue;
-                    }
-
-                    IDamageable damageable = hit.GetComponentInParent<IDamageable>();
-                    if (damageable != null && damagedTargets.Add(damageable))
-                    {
-                        damageable.TakeDamage(damage);
-                    }
-                }
-
-                Debug.Log("BOOM!", this);
+                Explode(collision.ClosestPoint(transform.position));
+                return;
             }
             else
             {
                 IDamageable damageable = collision.GetComponentInParent<IDamageable>();
                 damageable?.TakeDamage(damage);
-            }
-
-            if (isExplosive)
-            {
-                StartImpactAnimation();
-                return;
             }
 
             Deactivate();
@@ -221,16 +200,45 @@ public sealed class Projectile : MonoBehaviour
 
         if (hitsGround)
         {
-            hasHit = true;
-
             if (isExplosive)
             {
-                StartImpactAnimation();
+                Explode(collision.ClosestPoint(transform.position));
                 return;
             }
 
+            hasHit = true;
             Deactivate();
         }
+    }
+
+    private void Explode(Vector3 explosionPosition)
+    {
+        hasHit = true;
+        transform.position = explosionPosition;
+
+        Collider2D[] blastHits = Physics2D.OverlapCircleAll(transform.position, explosionRadius);
+        HashSet<IDamageable> damagedTargets = new HashSet<IDamageable>();
+
+        foreach (Collider2D hit in blastHits)
+        {
+            bool blastHitsDamageTarget = !string.IsNullOrEmpty(targetTag)
+                ? hit.gameObject.CompareTag(targetTag)
+                : IsInLayerMask(hit.gameObject.layer, damageLayers);
+
+            if (!blastHitsDamageTarget)
+            {
+                continue;
+            }
+
+            IDamageable damageable = hit.GetComponentInParent<IDamageable>();
+            if (damageable != null && damagedTargets.Add(damageable))
+            {
+                damageable.TakeDamage(damage);
+            }
+        }
+
+        Debug.Log("BOOM!", this);
+        StartImpactAnimation();
     }
 
     private void StartImpactAnimation()
@@ -263,16 +271,28 @@ public sealed class Projectile : MonoBehaviour
             }
         }
 
-        if (sr == null || impactFrames == null || impactFrames.Length < 2)
+        Sprite[] framesToPlay = isExplosive && explosionFrames != null && explosionFrames.Length > 0
+            ? explosionFrames
+            : impactFrames;
+
+        if (isExplosive)
+        {
+            float explosionDiameter = Mathf.Max(0.01f, explosionRadius * 2f);
+            transform.localScale = new Vector3(explosionDiameter, explosionDiameter, 1f);
+        }
+
+        if (sr == null || framesToPlay == null || framesToPlay.Length == 0)
         {
             impactAnimationRoutine = null;
             Deactivate();
             yield break;
         }
 
-        for (int i = 1; i < impactFrames.Length; i++)
+        sr.sprite = framesToPlay[0];
+
+        for (int i = 1; i < framesToPlay.Length; i++)
         {
-            sr.sprite = impactFrames[i];
+            sr.sprite = framesToPlay[i];
             yield return new WaitForSeconds(0.02f);
         }
 
@@ -288,6 +308,8 @@ public sealed class Projectile : MonoBehaviour
         {
             rb.linearVelocity = Vector2.zero;
         }
+
+        transform.localScale = defaultLocalScale;
 
         gameObject.SetActive(false);
         owningPooler?.ReturnProjectile(gameObject);
@@ -336,7 +358,14 @@ public sealed class Projectile : MonoBehaviour
             ? collider.gameObject.CompareTag(targetTag)
             : IsInLayerMask(collider.gameObject.layer, damageLayers);
 
-        return hitsDamageTarget || IsInLayerMask(collider.gameObject.layer, groundLayers);
+        return hitsDamageTarget || IsWorldGeometry(collider);
+    }
+
+    private bool IsWorldGeometry(Collider2D collider)
+    {
+        return IsInLayerMask(collider.gameObject.layer, groundLayers)
+            || collider.gameObject.tag == "Ground"
+            || collider.gameObject.tag == "Environment";
     }
 
     private static void ApplyCryoDebuff(Collider2D collision)

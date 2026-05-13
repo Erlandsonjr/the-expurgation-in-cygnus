@@ -29,6 +29,7 @@ public sealed class WaveManager : MonoBehaviour
 
     [Header("Spawn Setup")]
     [SerializeField] private GameObject enemyPrefab;
+    public GameObject arkanoDronePrefab;
     [SerializeField] private Transform[] spawnPoints;
     [SerializeField] private Transform playerTarget;
 
@@ -92,11 +93,7 @@ public sealed class WaveManager : MonoBehaviour
 
         if (UpgradeManager.Instance != null)
         {
-            // Wave 3 (index 2) → weapon selection; all other waves → general stat upgrades.
-            if (currentWaveIndex == 2)
-                UpgradeManager.Instance.ShowWeaponUpgrades();
-            else
-                UpgradeManager.Instance.ShowGeneralUpgrades();
+            UpgradeManager.Instance.ShowGeneralUpgrades();
         }
         else
         {
@@ -125,17 +122,8 @@ public sealed class WaveManager : MonoBehaviour
             return;
         }
 
-        // Choose prefab: wave override list first, then global fallback.
         WaveData wave = waves[currentWaveIndex];
-        GameObject prefabToSpawn = null;
-        if (wave.allowedEnemyPrefabs != null && wave.allowedEnemyPrefabs.Length > 0)
-        {
-            prefabToSpawn = wave.allowedEnemyPrefabs[Random.Range(0, wave.allowedEnemyPrefabs.Length)];
-        }
-        else
-        {
-            prefabToSpawn = enemyPrefab;
-        }
+        GameObject prefabToSpawn = ChoosePrefabForWave(wave);
 
         if (prefabToSpawn == null)
         {
@@ -143,7 +131,8 @@ public sealed class WaveManager : MonoBehaviour
         }
 
         bool isSniper = prefabToSpawn.GetComponent<ArkanoSniperAI>() != null;
-        Transform selectedSpawnPoint = PickSpawnPoint(isSniper);
+        bool isDrone = prefabToSpawn == arkanoDronePrefab;
+        Transform selectedSpawnPoint = PickSpawnPoint(isSniper || isDrone, isSniper);
         if (selectedSpawnPoint == null)
         {
             return;
@@ -160,26 +149,88 @@ public sealed class WaveManager : MonoBehaviour
         {
             sniperAI.SetTarget(ResolvePlayerTarget());
         }
+
+        if (enemyObject.TryGetComponent(out SineWaveAI sineWaveAI))
+        {
+            sineWaveAI.SetTarget(ResolvePlayerTarget());
+        }
+    }
+
+    private GameObject ChoosePrefabForWave(WaveData wave)
+    {
+        GameObject scoutPrefab = enemyPrefab;
+        GameObject sniperPrefab = ResolveSniperPrefab(wave);
+        GameObject dronePrefab = arkanoDronePrefab;
+
+        float scoutWeight = scoutPrefab != null ? Mathf.Max(2f, 100f - (CurrentWave * 12f)) : 0f;
+        float sniperWeight = CurrentWave >= 2 && sniperPrefab != null ? 25f + (CurrentWave * 3f) : 0f;
+        float droneWeight = CurrentWave >= 3 && dronePrefab != null ? 15f + ((CurrentWave - 3) * 8f) : 0f;
+        float totalWeight = scoutWeight + sniperWeight + droneWeight;
+
+        if (totalWeight > 0f)
+        {
+            float roll = Random.Range(0f, totalWeight);
+
+            if (roll < scoutWeight)
+            {
+                return scoutPrefab;
+            }
+
+            roll -= scoutWeight;
+            if (roll < sniperWeight)
+            {
+                return sniperPrefab;
+            }
+
+            return dronePrefab != null ? dronePrefab : (sniperPrefab != null ? sniperPrefab : scoutPrefab);
+        }
+
+        if (wave.allowedEnemyPrefabs != null && wave.allowedEnemyPrefabs.Length > 0)
+        {
+            return wave.allowedEnemyPrefabs[Random.Range(0, wave.allowedEnemyPrefabs.Length)];
+        }
+
+        return enemyPrefab;
+    }
+
+    private static GameObject ResolveSniperPrefab(WaveData wave)
+    {
+        if (wave.allowedEnemyPrefabs == null)
+        {
+            return null;
+        }
+
+        foreach (GameObject prefab in wave.allowedEnemyPrefabs)
+        {
+            if (prefab != null && prefab.GetComponent<ArkanoSniperAI>() != null)
+            {
+                return prefab;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
-    /// Picks a random spawn point. For sniper enemies, excludes points whose
-    /// name contains 'South' or that have the lowest Y position in the array.
+    /// Picks a random spawn point. Snipers exclude South-named points and the
+    /// lowest-Y point. Arkano Drones exclude South-named points only.
     /// </summary>
-    private Transform PickSpawnPoint(bool excludeSouth)
+    private Transform PickSpawnPoint(bool excludeSouth, bool excludeLowestY)
     {
-        if (!excludeSouth)
+        if (!excludeSouth && !excludeLowestY)
         {
             return spawnPoints[Random.Range(0, spawnPoints.Length)];
         }
 
-        // Build a filtered list: no 'South' in name and not the lowest-Y point.
         float minY = float.MaxValue;
-        foreach (Transform sp in spawnPoints)
+        if (excludeLowestY)
         {
-            if (sp != null && sp.position.y < minY)
+            foreach (Transform sp in spawnPoints)
             {
-                minY = sp.position.y;
+                if (sp != null && sp.position.y < minY)
+                {
+                    minY = sp.position.y;
+                }
             }
         }
 
@@ -188,8 +239,8 @@ public sealed class WaveManager : MonoBehaviour
         {
             if (sp == null) continue;
             bool isSouth = sp.name.IndexOf("South", System.StringComparison.OrdinalIgnoreCase) >= 0;
-            bool isLowest = Mathf.Approximately(sp.position.y, minY);
-            if (!isSouth && !isLowest)
+            bool isLowest = excludeLowestY && Mathf.Approximately(sp.position.y, minY);
+            if ((!excludeSouth || !isSouth) && !isLowest)
             {
                 filtered.Add(sp);
             }

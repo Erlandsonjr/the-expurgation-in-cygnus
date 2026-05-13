@@ -10,11 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 11eb32ee32fef864a9d46213eb8d4ecf, type: 3}
-  m_Name: Card_IgnitionCore
+  m_Name: Card_DroneCompanion
   m_EditorClassIdentifier: Assembly-CSharp::CardData
-  cardName: Ignition Core
-  description: Dash creates a blast.
+  cardName: Companion Drone
+  description: Deploys a drone companion that follows the Purger and fires at nearby threats.
   cardIcon: {fileID: 0}
-  rarity: 2
-  effectType: 11
-  effectValue: 1
+  rarity: 3
+  isUnique: 1
+  effectType: 17
+  effectValue: 0

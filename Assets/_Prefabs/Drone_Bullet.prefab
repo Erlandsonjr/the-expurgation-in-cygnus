@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 7800232862057845985}
   - component: {fileID: 421666269790685022}
   m_Layer: 0
-  m_Name: Bullet
+  m_Name: Drone_Bullet
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -30,7 +30,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.3, y: 0.3, z: 1}
+  m_LocalScale: {x: 0.6, y: 0.6, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -179,6 +179,7 @@ MonoBehaviour:
   defaultSpeed: 10
   targetTag: 
   isExplosive: 0
+  isCryo: 0
   explosionRadius: 3
   impactFrames:
   - {fileID: -6020267291072260014, guid: 775e02ca401bb844bb8a191b1960dc30, type: 3}
@@ -186,9 +187,3 @@ MonoBehaviour:
   - {fileID: -3257189097084790531, guid: 775e02ca401bb844bb8a191b1960dc30, type: 3}
   - {fileID: -9081026888222054964, guid: 775e02ca401bb844bb8a191b1960dc30, type: 3}
   - {fileID: -41114550856773343, guid: 775e02ca401bb844bb8a191b1960dc30, type: 3}
-  explosionFrames:
-  - {fileID: -3558495015784052242, guid: e2599572f96b52b4aa568b78415ef7cb, type: 3}
-  - {fileID: 7297071982271646098, guid: e2599572f96b52b4aa568b78415ef7cb, type: 3}
-  - {fileID: 6909970355391142710, guid: e2599572f96b52b4aa568b78415ef7cb, type: 3}
-  - {fileID: 4151189897247681556, guid: e2599572f96b52b4aa568b78415ef7cb, type: 3}
-  - {fileID: 4908679818743953125, guid: e2599572f96b52b4aa568b78415ef7cb, type: 3}

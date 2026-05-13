@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 5163c523a0be7a54fbbfa8e1f13af591
+guid: 53e28517dabb06a47809e4870cc7c6b8
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 5189691121816951081
-    second: card_0
+      213: -7577178876467797856
+    second: arkano_drone_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -75,7 +75,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 0
+    textureCompression: 1
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: card_0
+      name: arkano_drone_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 916
-        height: 1356
+        x: 231
+        y: 159
+        width: 862
+        height: 953
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 929d5e1449c750840800000000000000
-      internalID: 5189691121816951081
+      spriteID: 0a02b8c15f378d690800000000000000
+      internalID: -7577178876467797856
       vertices: []
       indices: 
       edges: []
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      card_0: 5189691121816951081
+      arkano_drone_0: -7577178876467797856
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

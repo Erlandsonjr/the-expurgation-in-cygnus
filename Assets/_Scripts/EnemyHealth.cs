@@ -6,7 +6,6 @@ public sealed class EnemyHealth : MonoBehaviour, IDamageable
 {
     [SerializeField] private float maxHealth = 3f;
     [SerializeField] private float flashDuration = 0.1f;
-    [SerializeField] private Color flashColor = new Color(1f, 0.25f, 0.25f, 1f); // bright red tint
     [SerializeField] private SpriteRenderer spriteRenderer;
 
     private Color baseColor = Color.white;
@@ -112,7 +111,7 @@ public sealed class EnemyHealth : MonoBehaviour, IDamageable
     {
         if (spriteRenderer != null)
         {
-            spriteRenderer.color = flashColor;
+            spriteRenderer.color = Color.red;
         }
 
         yield return new WaitForSeconds(flashDuration);
@@ -162,9 +161,7 @@ public sealed class EnemyHealth : MonoBehaviour, IDamageable
     {
         if (spriteRenderer != null)
         {
-            // Always revert to white so the sprite displays at its natural colour.
-            // baseColor is retained for systems that need to query the logical tint.
-            spriteRenderer.color = Color.white;
+            spriteRenderer.color = baseColor;
         }
     }
 }

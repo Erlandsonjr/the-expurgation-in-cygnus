@@ -16,9 +16,10 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     private static readonly int AimYParameterHash = Animator.StringToHash("aimY");
     private static readonly int IsDashingParameterHash = Animator.StringToHash("isDashing");
     private const float InvincibilityFlickerInterval = 0.08f;
-    private static readonly Color DashRingVisibleColor = new Color(1f, 1f, 0.5f, 0.8f);
-    private const string DashRingSpritePath = "UI/Skin/Background.psd";
-    private const string DashRingSpriteFallbackPath = "UI/Skin/UISprite.psd";
+    private const float MissingReferenceRetryInterval = 0.5f;
+    private static readonly Color DashRingVisibleColor = new Color(1f, 0.5f, 0f, 0.6f);
+    private static readonly Vector3 WeaponVisualLocalPosition = new Vector3(0.309f, -0.202f, 0f);
+    private static readonly Vector3 WeaponVisualBaseScale = new Vector3(0.4f, 0.4f, 1f);
 
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 8f;
@@ -56,6 +57,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     [SerializeField] private float knockbackTotalTime = 0.2f;
 
     [Header("Combat")]
+    [SerializeField] private WeaponData defaultWeapon;
     [SerializeField] private WeaponData activeWeapon;
     [SerializeField] private ProjectilePooler projectilePooler;
 
@@ -67,7 +69,6 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     public float dashCooldownMultiplier = 1f;
     public float extraIframeTime = 0f;
     public int extraJumps = 0;
-    public bool hasDashExplosion = false;
     public bool nextShotIsCrit = false;
     public bool hasCryoAmmo = false;
     public bool hasBerserkerRage = false;
@@ -81,6 +82,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
     [Header("UI")]
     [SerializeField] private GameOverManager gameOverManager;
+    public Sprite dashRingSprite;
     [SerializeField] public Sprite[] healthSprites;
     [SerializeField] public UnityEngine.UI.Image healthBarImage;
     [SerializeField] public UnityEngine.UI.Image dashCooldownFill;
@@ -104,6 +106,8 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     private float coyoteCounter;
     private int currentJumps;
     private float jumpBufferCounter;
+    private float nextDefaultWeaponLookupTime;
+    private float nextProjectilePoolLookupTime;
     private float shotCooldownTimer;
     private bool isFiringLaser;
     private bool hasCritAfterDashUpgrade;
@@ -136,16 +140,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         }
 
         rigidbody2d.gravityScale = baseGravityScale;
-        aimPivot ??= transform.Find("Pivot");
-
-        if (weaponPivot == null)
-            weaponPivot = transform.Find("WeaponPivot");
-        if (weaponVisualRenderer == null)
-        {
-            Transform wv = weaponPivot != null ? weaponPivot.Find("WeaponVisual") : null;
-            if (wv != null)
-                weaponVisualRenderer = wv.GetComponent<SpriteRenderer>();
-        }
+        ResolveWeaponRig();
 
         Transform bodyTransform = transform.Find("Body");
         if (bodyTransform != null)
@@ -157,15 +152,9 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         bodyAnimator ??= GetComponentInChildren<Animator>();
         bodySpriteRenderer ??= GetComponentInChildren<SpriteRenderer>();
         gameOverManager ??= FindAnyObjectByType<GameOverManager>();
+        projectilePooler ??= FindAnyObjectByType<ProjectilePooler>();
 
-        if (dashCooldownFill == null)
-        {
-            Transform dashFillTransform = GameObject.Find("Canvas")?.transform.Find("DashCooldownBar/Fill");
-            if (dashFillTransform != null)
-            {
-                dashCooldownFill = dashFillTransform.GetComponent<UnityEngine.UI.Image>();
-            }
-        }
+        ResolveWeaponRig();
 
         if (healthBarImage == null)
         {
@@ -210,22 +199,141 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
             bodyDefaultColor = bodySpriteRenderer.color;
         }
 
-        // Equip default weapon (FirstWeapon) if none assigned in the Inspector.
-        if (activeWeapon == null)
+        WeaponData initialWeapon = activeWeapon != null ? activeWeapon : ResolveDefaultWeapon();
+        if (initialWeapon != null)
         {
-            var defaultWeapon = UnityEngine.Resources.Load<WeaponData>("FirstWeapon");
-            if (defaultWeapon == null)
-                defaultWeapon = UnityEngine.Resources.FindObjectsOfTypeAll<WeaponData>()
-                    is WeaponData[] all && all.Length > 0 ? all[0] : null;
-            if (defaultWeapon != null)
-                EquipWeapon(defaultWeapon);
-        }
-        else if (weaponVisualRenderer != null)
-        {
-            weaponVisualRenderer.sprite = activeWeapon.WeaponSprite;
+            EquipWeapon(initialWeapon);
         }
 
+        EnsureCombatDependencies(true);
+
         NotifyHealthChanged();
+    }
+
+    private void Start()
+    {
+        EnsureCombatDependencies(true);
+    }
+
+    private void ResolveWeaponRig()
+    {
+        aimPivot ??= transform.Find("AimPivot") ?? transform.Find("Pivot");
+        weaponPivot ??= transform.Find("WeaponPivot") ?? aimPivot;
+
+        if (weaponPivot != null)
+        {
+            weaponPivot.localScale = Vector3.one;
+        }
+
+        if (weaponVisualRenderer == null && weaponPivot != null)
+        {
+            Transform weaponVisual = weaponPivot.Find("WeaponVisual");
+            if (weaponVisual != null)
+            {
+                weaponVisualRenderer = weaponVisual.GetComponent<SpriteRenderer>();
+            }
+        }
+
+        if (weaponVisualRenderer == null && weaponPivot != null)
+        {
+            GameObject weaponVisualObject = new GameObject("WeaponVisual", typeof(SpriteRenderer));
+            weaponVisualObject.transform.SetParent(weaponPivot, false);
+            weaponVisualRenderer = weaponVisualObject.GetComponent<SpriteRenderer>();
+            weaponVisualRenderer.sortingOrder = 15;
+            if (bodySpriteRenderer != null)
+            {
+                weaponVisualRenderer.sharedMaterial = bodySpriteRenderer.sharedMaterial;
+            }
+        }
+
+        ResetWeaponVisualTransform();
+    }
+
+    private void ResetWeaponVisualTransform()
+    {
+        if (weaponVisualRenderer == null)
+        {
+            return;
+        }
+
+        Transform weaponVisualTransform = weaponVisualRenderer.transform;
+        if (weaponPivot != null && weaponVisualTransform.parent != weaponPivot)
+        {
+            weaponVisualTransform.SetParent(weaponPivot, false);
+        }
+
+        weaponVisualTransform.localPosition = WeaponVisualLocalPosition;
+        weaponVisualTransform.localRotation = Quaternion.identity;
+        weaponVisualTransform.localScale = WeaponVisualBaseScale;
+    }
+
+    private WeaponData ResolveDefaultWeapon()
+    {
+        if (defaultWeapon != null)
+        {
+            return defaultWeapon;
+        }
+
+        WeaponData namedWeapon = FindWeaponAsset("FirstWeapon");
+        if (namedWeapon != null)
+        {
+            return namedWeapon;
+        }
+
+        namedWeapon = FindWeaponAsset("LaserPistol");
+        if (namedWeapon != null)
+        {
+            return namedWeapon;
+        }
+
+        WeaponData[] allWeapons = Resources.FindObjectsOfTypeAll<WeaponData>();
+        return allWeapons != null && allWeapons.Length > 0 ? allWeapons[0] : null;
+    }
+
+    private static WeaponData FindWeaponAsset(string weaponName)
+    {
+        if (string.IsNullOrEmpty(weaponName))
+        {
+            return null;
+        }
+
+        foreach (WeaponData weapon in Resources.FindObjectsOfTypeAll<WeaponData>())
+        {
+            if (weapon == null)
+            {
+                continue;
+            }
+
+            if (string.Equals(weapon.WeaponName, weaponName, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(weapon.name, weaponName, StringComparison.OrdinalIgnoreCase))
+            {
+                return weapon;
+            }
+        }
+
+        return null;
+    }
+
+    private void EnsureCombatDependencies(bool force = false)
+    {
+        float now = Time.unscaledTime;
+
+        if (projectilePooler == null && (force || now >= nextProjectilePoolLookupTime))
+        {
+            projectilePooler = FindAnyObjectByType<ProjectilePooler>();
+            nextProjectilePoolLookupTime = now + MissingReferenceRetryInterval;
+        }
+
+        if (activeWeapon == null && (force || now >= nextDefaultWeaponLookupTime))
+        {
+            WeaponData fallbackWeapon = ResolveDefaultWeapon();
+            if (fallbackWeapon != null)
+            {
+                EquipWeapon(fallbackWeapon);
+            }
+
+            nextDefaultWeaponLookupTime = now + MissingReferenceRetryInterval;
+        }
     }
 
     private void Update()
@@ -244,6 +352,8 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         {
             moveInput = ReadMoveInput();
         }
+
+        EnsureCombatDependencies();
 
         jumpHeld = IsJumpHeld();
         UpdateAnimation();
@@ -342,6 +452,11 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
     private void UpdateAim()
     {
+        if (aimPivot == null || weaponPivot == null || weaponVisualRenderer == null)
+        {
+            ResolveWeaponRig();
+        }
+
         if (aimPivot == null || Mouse.current == null)
         {
             return;
@@ -381,15 +496,19 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         float aimAngle = Mathf.Atan2(aimDirection.y, aimDirection.x) * Mathf.Rad2Deg;
         aimPivot.rotation = Quaternion.Euler(0f, 0f, aimAngle);
 
-        if (weaponPivot != null)
-            weaponPivot.rotation = Quaternion.Euler(0f, 0f, aimAngle);
+        if (weaponPivot == null || activeWeapon == null)
+        {
+            return;
+        }
+
+        weaponPivot.rotation = Quaternion.Euler(0f, 0f, aimAngle);
 
         if (weaponVisualRenderer != null)
         {
             bool mouseLeft = mouseWorldPosition.x < transform.position.x;
             Transform wvt = weaponVisualRenderer.transform;
             // Uniform 0.4 scale so the weapon is not squashed and stays small.
-            wvt.localScale = new Vector3(0.4f, mouseLeft ? -0.4f : 0.4f, 1f);
+            wvt.localScale = new Vector3(WeaponVisualBaseScale.x, mouseLeft ? -WeaponVisualBaseScale.y : WeaponVisualBaseScale.y, WeaponVisualBaseScale.z);
         }
     }
 
@@ -441,46 +560,21 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
             fillAmount = Mathf.Clamp01(timeSinceDash / GetEffectiveDashCooldown());
         }
 
-        if (dashCooldownFill != null)
-        {
-            dashCooldownFill.fillAmount = fillAmount;
-        }
-
         UpdateDashCooldownRing(fillAmount);
     }
 
     private IEnumerator DashRoutine()
     {
-        if (hasDashExplosion)
-        {
-            Collider2D[] blastHits = Physics2D.OverlapCircleAll(transform.position, 4f);
-            HashSet<IDamageable> damagedTargets = new HashSet<IDamageable>();
-            foreach (Collider2D hit in blastHits)
-            {
-                IDamageable damageable = hit.GetComponentInParent<IDamageable>();
-                if (damageable == null || ReferenceEquals(damageable, this))
-                {
-                    continue;
-                }
-
-                if (damageable != null && damagedTargets.Add(damageable))
-                {
-                    damageable.TakeDamage(3f);
-                }
-            }
-        }
-
-        isDashing = true;
-        if (dashCooldownFill != null) dashCooldownFill.fillAmount = 0f;
-        ResetDashCooldownRing();
-        if (bodySpriteRenderer != null)
-            bodySpriteRenderer.color = new Color(1f, 1f, 1f, 0.5f);
-
         Vector2 dashDir = ((Vector3)lastAimWorldPosition - transform.position).normalized;
         if (dashDir.sqrMagnitude < 0.0001f)
         {
             dashDir = Vector2.right;
         }
+
+        isDashing = true;
+        ResetDashCooldownRing();
+        if (bodySpriteRenderer != null)
+            bodySpriteRenderer.color = new Color(1f, 1f, 1f, 0.5f);
 
         rigidbody2d.linearVelocity = dashDir * dashSpeed;
 
@@ -501,11 +595,28 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     /// <summary>Equips a new weapon, updating stats and the visual sprite immediately.</summary>
     public void EquipWeapon(WeaponData newWeapon)
     {
-        if (newWeapon == null) return;
+        if (newWeapon == null)
+        {
+            return;
+        }
+
+        ResolveWeaponRig();
+
         activeWeapon = newWeapon;
         shotCooldownTimer = 0f;
+
+        if (weaponPivot == null)
+        {
+            return;
+        }
+
+        ResetWeaponVisualTransform();
+
         if (weaponVisualRenderer != null)
+        {
             weaponVisualRenderer.sprite = newWeapon.WeaponSprite;
+            weaponVisualRenderer.enabled = newWeapon.WeaponSprite != null;
+        }
     }
 
     // ── Stat modifier methods (called by UpgradeManager general upgrades) ─────
@@ -599,10 +710,6 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
                 extraJumps += Mathf.RoundToInt(card.effectValue);
                 break;
 
-            case CardEffectType.DashExplosion:
-                hasDashExplosion = true;
-                break;
-
             case CardEffectType.CritNextShot:
                 hasCritAfterDashUpgrade = true;
                 break;
@@ -674,8 +781,12 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
     private void TryFireProjectile()
     {
+        EnsureCombatDependencies();
+
         if (activeWeapon == null || aimPivot == null)
+        {
             return;
+        }
 
         // --- Continuous Laser ---
         if (activeWeapon.weaponType == WeaponType.ContinuousLaser)
@@ -710,7 +821,14 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
         // --- Normal / Explosive projectile ---
         if (projectilePooler == null)
+        {
+            EnsureCombatDependencies(true);
+        }
+
+        if (projectilePooler == null)
+        {
             return;
+        }
 
         float projectileDamage = GetEffectiveDamage();
         if (nextShotIsCrit)
@@ -895,7 +1013,6 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     {
         RectTransform ringCanvasTransform = null;
         RectTransform ringTransform = null;
-        Sprite dashRingSprite = LoadDashRingSprite();
 
         if (dashCooldownRingImage != null)
         {
@@ -925,11 +1042,6 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
         if (dashCooldownRingImage == null)
         {
-            if (dashRingSprite == null)
-            {
-                return;
-            }
-
             GameObject canvasGO = new GameObject("DashRingCanvas", typeof(RectTransform), typeof(Canvas));
             ringCanvasTransform = canvasGO.GetComponent<RectTransform>();
             ringCanvasTransform.SetParent(transform, false);
@@ -955,10 +1067,10 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
         ringCanvasTransform.name = "DashRingCanvas";
         ringCanvasTransform.SetParent(transform, false);
-        ringCanvasTransform.localPosition = new Vector3(0f, -0.6f, 0f);
+        ringCanvasTransform.localPosition = new Vector3(0f, -0.7f, 0f);
         ringCanvasTransform.localRotation = Quaternion.identity;
         ringCanvasTransform.localScale = Vector3.one;
-        ringCanvasTransform.sizeDelta = new Vector2(2f, 2f);
+        ringCanvasTransform.sizeDelta = new Vector2(0.9f, 0.9f);
 
         Canvas ringCanvas = ringCanvasTransform.GetComponent<Canvas>();
         if (ringCanvas == null)
@@ -968,7 +1080,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
         ringCanvas.renderMode = RenderMode.WorldSpace;
         ringCanvas.overrideSorting = true;
-        ringCanvas.sortingOrder = 50;
+        ringCanvas.sortingOrder = -1;
 
         ringTransform.SetParent(ringCanvasTransform, false);
         ringTransform.anchorMin = Vector2.zero;
@@ -980,10 +1092,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         ringTransform.anchoredPosition = Vector2.zero;
         ringTransform.sizeDelta = Vector2.zero;
 
-        if (dashRingSprite != null)
-        {
-            dashCooldownRingImage.sprite = dashRingSprite;
-        }
+        dashCooldownRingImage.sprite = dashRingSprite;
 
         dashCooldownRingImage.color = DashRingVisibleColor;
         dashCooldownRingImage.fillAmount = Mathf.Clamp01(dashCooldownRingImage.fillAmount);
@@ -1070,12 +1179,6 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         hiddenColor.a = 0f;
         dashCooldownRingImage.color = hiddenColor;
         dashRingFlashRoutine = null;
-    }
-
-    private static Sprite LoadDashRingSprite()
-    {
-        return Resources.GetBuiltinResource<Sprite>(DashRingSpritePath)
-            ?? Resources.GetBuiltinResource<Sprite>(DashRingSpriteFallbackPath);
     }
 
     private System.Collections.IEnumerator HideLaserAfterDelay(float delay)
