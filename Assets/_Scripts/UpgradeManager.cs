@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Manages the inter-wave upgrade card flow through a single randomized pool.
@@ -23,6 +24,7 @@ public sealed class UpgradeManager : MonoBehaviour
     // ── General Upgrade Panel ────────────────────────────────────────────────
     [Header("General Upgrade Panel")]
     [SerializeField] public GameObject generalUpgradePanel;
+    [SerializeField] private GameObject victoryPanel;
     public Button[] generalChoiceButtons;
     [SerializeField] private GameObject droneCompanionPrefab;
     [SerializeField] private Sprite upgradeCardSprite;
@@ -49,6 +51,7 @@ public sealed class UpgradeManager : MonoBehaviour
 
         if (upgradePanel        != null) upgradePanel.SetActive(false);
         if (generalUpgradePanel != null) generalUpgradePanel.SetActive(false);
+        if (victoryPanel        != null) victoryPanel.SetActive(false);
     }
 
     private void OnDestroy()
@@ -728,6 +731,36 @@ public sealed class UpgradeManager : MonoBehaviour
 
     /// <summary>Legacy entry point — routes to the shared randomized card flow.</summary>
     public void ShowPanel() => ShowGeneralUpgrades();
+
+    public void ShowVictoryPanel()
+    {
+        if (upgradePanel != null)
+        {
+            upgradePanel.SetActive(false);
+        }
+
+        if (generalUpgradePanel != null)
+        {
+            generalUpgradePanel.SetActive(false);
+        }
+
+        SetUpgradeHeaderVisible(false);
+
+        if (victoryPanel != null)
+        {
+            victoryPanel.SetActive(true);
+        }
+        else
+        {
+            Debug.LogWarning("[UpgradeManager] Victory panel is not assigned.");
+        }
+    }
+
+    public void LoadMainMenu()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene("MainMenu");
+    }
 
     /// <summary>Legacy hide — hides both panels and advances.</summary>
     public void HidePanel()

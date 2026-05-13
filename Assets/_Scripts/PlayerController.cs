@@ -82,6 +82,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
     [Header("UI")]
     [SerializeField] private GameOverManager gameOverManager;
+    [SerializeField] private GameObject controlsOverlay;
     public Sprite dashRingSprite;
     [SerializeField] public Sprite[] healthSprites;
     [SerializeField] public UnityEngine.UI.Image healthBarImage;
@@ -213,6 +214,36 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     private void Start()
     {
         EnsureCombatDependencies(true);
+
+        if (controlsOverlay == null)
+        {
+            Transform controlsOverlayTransform = GameObject.Find("Canvas")?.transform.Find("ControlsOverlay");
+            if (controlsOverlayTransform != null)
+            {
+                controlsOverlay = controlsOverlayTransform.gameObject;
+            }
+        }
+
+        if (controlsOverlay != null)
+        {
+            controlsOverlay.SetActive(true);
+            Time.timeScale = 0f;
+        }
+    }
+
+    public void DismissControls()
+    {
+        if (controlsOverlay != null)
+        {
+            controlsOverlay.SetActive(false);
+        }
+
+        Time.timeScale = 1f;
+    }
+
+    private bool IsControlsOverlayActive()
+    {
+        return controlsOverlay != null && controlsOverlay.activeInHierarchy;
     }
 
     private void ResolveWeaponRig()
@@ -343,6 +374,16 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
             return;
         }
 
+        EnsureCombatDependencies();
+
+        if (IsControlsOverlayActive())
+        {
+            moveInput = Vector2.zero;
+            jumpHeld = false;
+            UpdateAnimation();
+            return;
+        }
+
         if (knockbackCounter > 0f)
         {
             knockbackCounter = Mathf.Max(0f, knockbackCounter - Time.deltaTime);
@@ -352,8 +393,6 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         {
             moveInput = ReadMoveInput();
         }
-
-        EnsureCombatDependencies();
 
         jumpHeld = IsJumpHeld();
         UpdateAnimation();
@@ -377,6 +416,13 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     private void FixedUpdate()
     {
         if (isDead)
+        {
+            rigidbody2d.linearVelocity = Vector2.zero;
+            rigidbody2d.gravityScale = baseGravityScale;
+            return;
+        }
+
+        if (IsControlsOverlayActive())
         {
             rigidbody2d.linearVelocity = Vector2.zero;
             rigidbody2d.gravityScale = baseGravityScale;

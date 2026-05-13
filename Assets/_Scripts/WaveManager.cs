@@ -91,6 +91,19 @@ public sealed class WaveManager : MonoBehaviour
         Debug.Log($"WAVE {currentWaveIndex + 1} COMPLETE");
         Time.timeScale = 0f;
 
+        if (currentWaveIndex + 1 >= waves.Length)
+        {
+            allWavesDone = true;
+            Debug.Log("ALL WAVES COMPLETE");
+
+            if (UpgradeManager.Instance != null)
+            {
+                UpgradeManager.Instance.ShowVictoryPanel();
+            }
+
+            return;
+        }
+
         if (UpgradeManager.Instance != null)
         {
             UpgradeManager.Instance.ShowGeneralUpgrades();
