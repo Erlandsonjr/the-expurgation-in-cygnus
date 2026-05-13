@@ -17,6 +17,13 @@ Um jogo de ação e sobrevivência com mecânicas *roguelike* e uma estética *p
 * **Arsenal Épico:** Encontre e equipe armamentos pesados únicos, como o *Heavy Rifle*, *Explosive Bow* e a *Laser Pistol*.
 * **Trilha Sonora Original:** Ação movida a um *synth-rock* atmosférico e cibernético.
 
+## 🚀 Como Jogar (Build Windows)
+
+1. Faça o download do arquivo `.zip` do jogo.
+2. Extraia todo o conteúdo do `.zip` para uma pasta no seu computador.
+3. Execute o arquivo `The Expurgation in Cygnus.exe`.
+*Nota: Não separe o executável da pasta `_Data`, ou o jogo não abrirá.*
+
 ## 🛠️ Desenvolvimento
 
 * **Motor Gráfico:** Unity 6
