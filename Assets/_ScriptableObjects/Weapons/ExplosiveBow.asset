@@ -18,3 +18,4 @@ MonoBehaviour:
   damage: 4
   fireRate: 0.8
   projectileSpeed: 34
+  shootSound: {fileID: 8300000, guid: 35d252cc47ad67d4d94a6b5299225701, type: 3}

@@ -21,6 +21,7 @@ public sealed class WeaponData : ScriptableObject
     [SerializeField] private float damage = 1f;
     [SerializeField] private float fireRate = 5f;
     [SerializeField] private float projectileSpeed = 14f;
+    public AudioClip shootSound;
 
     public string WeaponName => weaponName;
     public Sprite WeaponSprite => weaponSprite;

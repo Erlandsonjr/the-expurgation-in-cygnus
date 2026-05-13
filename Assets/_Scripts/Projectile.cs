@@ -32,6 +32,7 @@ public sealed class Projectile : MonoBehaviour
     public float explosionRadius = 3f;
     public Sprite[] impactFrames;
     public Sprite[] explosionFrames;
+    public AudioClip explosionSound;
     private SpriteRenderer sr;
 
     /// <summary>Serialized default speed; readable by external spawners before Setup is called.</summary>
@@ -215,6 +216,11 @@ public sealed class Projectile : MonoBehaviour
     {
         hasHit = true;
         transform.position = explosionPosition;
+
+        if (explosionSound != null)
+        {
+            AudioSource.PlayClipAtPoint(explosionSound, transform.position, 0.7f);
+        }
 
         Collider2D[] blastHits = Physics2D.OverlapCircleAll(transform.position, explosionRadius);
         HashSet<IDamageable> damagedTargets = new HashSet<IDamageable>();

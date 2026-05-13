@@ -59,7 +59,7 @@ public sealed class SineWaveAI : MonoBehaviour, IColdAffectable
         rb = GetComponent<Rigidbody2D>();
         if (rb != null)
         {
-            rb.isKinematic = true;
+            rb.bodyType = RigidbodyType2D.Kinematic;
             rb.gravityScale = 0f;
             rb.constraints = RigidbodyConstraints2D.FreezeRotation;
         }

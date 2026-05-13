@@ -60,6 +60,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     [SerializeField] private WeaponData defaultWeapon;
     [SerializeField] private WeaponData activeWeapon;
     [SerializeField] private ProjectilePooler projectilePooler;
+    public AudioSource sfxSource;
 
     [Header("Runtime Modifiers")]
     public float fireRateMultiplier = 1f;
@@ -825,6 +826,14 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         return Mathf.Max(0.01f, dashCooldown * dashCooldownMultiplier);
     }
 
+    private void PlayActiveWeaponShootSound()
+    {
+        if (sfxSource != null && activeWeapon != null && activeWeapon.shootSound != null)
+        {
+            sfxSource.PlayOneShot(activeWeapon.shootSound);
+        }
+    }
+
     private void TryFireProjectile()
     {
         EnsureCombatDependencies();
@@ -857,6 +866,7 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
                 return;
             }
 
+            PlayActiveWeaponShootSound();
             continuousLaserRoutine = StartCoroutine(LaserBeamRoutine(1f));
             shotCooldownTimer = GetEffectiveShotInterval();
             return;
@@ -887,6 +897,8 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         {
             return;
         }
+
+        PlayActiveWeaponShootSound();
 
         if (hasSpreadShot)
         {

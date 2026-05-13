@@ -192,3 +192,4 @@ MonoBehaviour:
   - {fileID: 6909970355391142710, guid: e2599572f96b52b4aa568b78415ef7cb, type: 3}
   - {fileID: 4151189897247681556, guid: e2599572f96b52b4aa568b78415ef7cb, type: 3}
   - {fileID: 4908679818743953125, guid: e2599572f96b52b4aa568b78415ef7cb, type: 3}
+  explosionSound: {fileID: 8300000, guid: e294868ab238cb142a4b1acee53853f7, type: 3}
