@@ -4,10 +4,6 @@ using UnityEngine.UI;
 using TMPro;
 using UnityEngine.SceneManagement;
 
-/// <summary>
-/// Manages the inter-wave upgrade card flow through a single randomized pool.
-/// Weapon pickups are represented as epic card rewards and can appear on any wave.
-/// </summary>
 [DisallowMultipleComponent]
 public sealed class UpgradeManager : MonoBehaviour
 {
@@ -17,11 +13,9 @@ public sealed class UpgradeManager : MonoBehaviour
 
     public static UpgradeManager Instance { get; private set; }
 
-    // ── Legacy Panel Ref ──────────────────────────────────────────────────────
     [Header("Legacy Weapon Panel")]
     [SerializeField] public GameObject upgradePanel;
 
-    // ── General Upgrade Panel ────────────────────────────────────────────────
     [Header("General Upgrade Panel")]
     [SerializeField] public GameObject generalUpgradePanel;
     [SerializeField] private GameObject victoryPanel;
@@ -31,11 +25,9 @@ public sealed class UpgradeManager : MonoBehaviour
     public List<CardData> cardPool = new List<CardData>();
     public float luckBonus = 0f;
 
-    // ── Internal refs ────────────────────────────────────────────────────────
     private WaveManager waveManager;
     private PlayerController playerController;
 
-    // ─────────────────────────────────────────────────────────────────────────
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
@@ -59,7 +51,6 @@ public sealed class UpgradeManager : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
-    // ── General Upgrades ──────────────────────────────────────────────────────
     public void ShowGeneralUpgrades()
     {
         if (generalUpgradePanel != null) generalUpgradePanel.SetActive(true);
@@ -720,7 +711,6 @@ public sealed class UpgradeManager : MonoBehaviour
             || string.Equals(weapon.name, name, System.StringComparison.OrdinalIgnoreCase);
     }
 
-    // ── Shared ────────────────────────────────────────────────────────────────
     private void AdvanceWave()
     {
         if (waveManager != null)
@@ -729,7 +719,6 @@ public sealed class UpgradeManager : MonoBehaviour
             Time.timeScale = 1f;
     }
 
-    /// <summary>Legacy entry point — routes to the shared randomized card flow.</summary>
     public void ShowPanel() => ShowGeneralUpgrades();
 
     public void ShowVictoryPanel()
@@ -762,7 +751,6 @@ public sealed class UpgradeManager : MonoBehaviour
         SceneManager.LoadScene("MainMenu");
     }
 
-    /// <summary>Legacy hide — hides both panels and advances.</summary>
     public void HidePanel()
     {
         if (upgradePanel        != null) upgradePanel.SetActive(false);

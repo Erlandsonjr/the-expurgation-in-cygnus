@@ -22,6 +22,7 @@ public sealed class WeaponData : ScriptableObject
     [SerializeField] private float fireRate = 5f;
     [SerializeField] private float projectileSpeed = 14f;
     public AudioClip shootSound;
+    public float shootVolume = 1f;
 
     public string WeaponName => weaponName;
     public Sprite WeaponSprite => weaponSprite;
@@ -35,5 +36,6 @@ public sealed class WeaponData : ScriptableObject
         damage = Mathf.Max(0f, damage);
         fireRate = Mathf.Max(0.01f, fireRate);
         projectileSpeed = Mathf.Max(0f, projectileSpeed);
+        shootVolume = Mathf.Max(0f, shootVolume);
     }
 }

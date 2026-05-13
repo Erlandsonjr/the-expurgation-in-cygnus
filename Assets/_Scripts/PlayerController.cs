@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
@@ -119,10 +120,12 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     private Vector2 moveInput;
     private bool isGrounded;
     private bool jumpHeld;
+    private bool hasDismissedControls;
     private Vector2 lastAimWorldPosition;
     private float lastDashTime = -10f;
     public bool isDashing = false;
     private Coroutine dashRingFlashRoutine;
+    private TMP_Text controlsOverlayPrimaryLabel;
 
     public event Action<float, float> HealthChanged;
 
@@ -216,14 +219,8 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     {
         EnsureCombatDependencies(true);
 
-        if (controlsOverlay == null)
-        {
-            Transform controlsOverlayTransform = GameObject.Find("Canvas")?.transform.Find("ControlsOverlay");
-            if (controlsOverlayTransform != null)
-            {
-                controlsOverlay = controlsOverlayTransform.gameObject;
-            }
-        }
+        ResolveControlsOverlay();
+        UpdateControlsOverlayPrimaryLabel();
 
         if (controlsOverlay != null)
         {
@@ -234,12 +231,25 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
 
     public void DismissControls()
     {
+        hasDismissedControls = true;
+
         if (controlsOverlay != null)
         {
             controlsOverlay.SetActive(false);
         }
 
         Time.timeScale = 1f;
+    }
+
+    public void QuitGame()
+    {
+        Time.timeScale = 1f;
+
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
     }
 
     private bool IsControlsOverlayActive()
@@ -374,6 +384,8 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         {
             return;
         }
+
+        HandlePauseToggle();
 
         EnsureCombatDependencies();
 
@@ -526,7 +538,6 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         lastAimWorldPosition = mouseWorldPosition;
         if (bodySpriteRenderer != null)
         {
-            // Mirror the body by flipping localScale.x so children scale with it.
             Transform bodyTransform = bodySpriteRenderer.transform;
             bool facingLeft = mouseWorldPosition.x < transform.position.x;
             Vector3 s = bodyTransform.localScale;
@@ -554,7 +565,6 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         {
             bool mouseLeft = mouseWorldPosition.x < transform.position.x;
             Transform wvt = weaponVisualRenderer.transform;
-            // Uniform 0.4 scale so the weapon is not squashed and stays small.
             wvt.localScale = new Vector3(WeaponVisualBaseScale.x, mouseLeft ? -WeaponVisualBaseScale.y : WeaponVisualBaseScale.y, WeaponVisualBaseScale.z);
         }
     }
@@ -639,7 +649,6 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         lastDashTime = Time.time;
     }
 
-    /// <summary>Equips a new weapon, updating stats and the visual sprite immediately.</summary>
     public void EquipWeapon(WeaponData newWeapon)
     {
         if (newWeapon == null)
@@ -666,7 +675,6 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         }
     }
 
-    // ── Stat modifier methods (called by UpgradeManager general upgrades) ─────
     public void AddMaxHealth(float delta)
     {
         maxHealth = Mathf.Max(1f, maxHealth + delta);
@@ -830,7 +838,62 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     {
         if (sfxSource != null && activeWeapon != null && activeWeapon.shootSound != null)
         {
-            sfxSource.PlayOneShot(activeWeapon.shootSound);
+            sfxSource.PlayOneShot(activeWeapon.shootSound, activeWeapon.shootVolume);
+        }
+    }
+
+    private void HandlePauseToggle()
+    {
+        if (!WasPausePressedThisFrame())
+        {
+            return;
+        }
+
+        if (IsControlsOverlayActive())
+        {
+            DismissControls();
+            return;
+        }
+
+        if (!hasDismissedControls)
+        {
+            return;
+        }
+
+        ResolveControlsOverlay();
+        UpdateControlsOverlayPrimaryLabel();
+
+        if (controlsOverlay != null)
+        {
+            controlsOverlay.SetActive(true);
+            Time.timeScale = 0f;
+        }
+    }
+
+    private void ResolveControlsOverlay()
+    {
+        if (controlsOverlay == null)
+        {
+            Transform controlsOverlayTransform = GameObject.Find("Canvas")?.transform.Find("ControlsOverlay");
+            if (controlsOverlayTransform != null)
+            {
+                controlsOverlay = controlsOverlayTransform.gameObject;
+            }
+        }
+
+        if (controlsOverlayPrimaryLabel == null && controlsOverlay != null)
+        {
+            controlsOverlayPrimaryLabel = controlsOverlay.transform.Find("StartButton/Text (TMP)")?.GetComponent<TMP_Text>();
+        }
+    }
+
+    private void UpdateControlsOverlayPrimaryLabel()
+    {
+        ResolveControlsOverlay();
+
+        if (controlsOverlayPrimaryLabel != null)
+        {
+            controlsOverlayPrimaryLabel.text = hasDismissedControls ? "RESUME" : "START";
         }
     }
 
@@ -843,7 +906,6 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
             return;
         }
 
-        // --- Continuous Laser ---
         if (activeWeapon.weaponType == WeaponType.ContinuousLaser)
         {
             if (isFiringLaser || shotCooldownTimer > 0f)
@@ -875,7 +937,6 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
         if (shotCooldownTimer > 0f)
             return;
 
-        // --- Normal / Explosive projectile ---
         if (projectilePooler == null)
         {
             EnsureCombatDependencies(true);
@@ -1471,6 +1532,12 @@ public sealed class PlayerController : MonoBehaviour, IDamageable
     {
         Keyboard keyboard = Keyboard.current;
         return keyboard != null && keyboard.spaceKey.wasPressedThisFrame;
+    }
+
+    private static bool WasPausePressedThisFrame()
+    {
+        Keyboard keyboard = Keyboard.current;
+        return keyboard != null && keyboard.escapeKey.wasPressedThisFrame;
     }
 
     private static bool IsPrimaryFireHeld()

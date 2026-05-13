@@ -5,8 +5,6 @@ public struct WaveData
 {
     public int enemyCount;
     public float spawnRate;
-    /// <summary>If non-empty, one of these is chosen at random each spawn.
-    /// Falls back to WaveManager.enemyPrefab when empty.</summary>
     public GameObject[] allowedEnemyPrefabs;
 }
 
@@ -55,7 +53,6 @@ public sealed class WaveManager : MonoBehaviour
 
         WaveData wave = waves[currentWaveIndex];
 
-        // Still have enemies to spawn in this wave.
         if (spawnedThisWave < wave.enemyCount)
         {
             spawnTimer -= Time.deltaTime;
@@ -68,7 +65,6 @@ public sealed class WaveManager : MonoBehaviour
             return;
         }
 
-        // Quota reached — wait for all active enemies to be cleared.
         int livingEnemies = CountLivingEnemies();
         if (livingEnemies == 0)
         {
@@ -80,7 +76,7 @@ public sealed class WaveManager : MonoBehaviour
     {
         currentWaveIndex = index;
         spawnedThisWave = 0;
-        spawnTimer = 0f;   // spawn first enemy immediately
+        spawnTimer = 0f;
         waveActive = true;
         Debug.Log($"WAVE {index + 1} START — {waves[index].enemyCount} enemies, rate {waves[index].spawnRate}s");
     }
@@ -114,7 +110,6 @@ public sealed class WaveManager : MonoBehaviour
         }
     }
 
-    /// <summary>Called externally (e.g., from a "Next Wave" UI button) to resume play.</summary>
     public void AdvanceToNextWave()
     {
         if (currentWaveIndex + 1 >= waves.Length)
@@ -224,10 +219,6 @@ public sealed class WaveManager : MonoBehaviour
         return null;
     }
 
-    /// <summary>
-    /// Picks a random spawn point. Snipers exclude South-named points and the
-    /// lowest-Y point. Arkano Drones exclude South-named points only.
-    /// </summary>
     private Transform PickSpawnPoint(bool excludeSouth, bool excludeLowestY)
     {
         if (!excludeSouth && !excludeLowestY)
@@ -259,7 +250,6 @@ public sealed class WaveManager : MonoBehaviour
             }
         }
 
-        // Fall back to any point if all were filtered out.
         if (filtered.Count == 0)
         {
             return spawnPoints[Random.Range(0, spawnPoints.Length)];
@@ -270,7 +260,6 @@ public sealed class WaveManager : MonoBehaviour
 
     private static int CountLivingEnemies()
     {
-        // EnemyHealth is on every enemy; count active ones in the scene.
         return FindObjectsByType<EnemyHealth>().Length;
     }
 

@@ -19,3 +19,4 @@ MonoBehaviour:
   fireRate: 0.33
   projectileSpeed: 20
   shootSound: {fileID: 8300000, guid: 3652ce639964820488b8e70049bb4543, type: 3}
+  shootVolume: 1

@@ -9,11 +9,6 @@ public sealed class Projectile : MonoBehaviour
     [SerializeField] private LayerMask groundLayers;
 
     [SerializeField] private float defaultSpeed = 10f;
-
-    /// <summary>
-    /// When non-empty, hit detection uses tag comparison instead of <see cref="damageLayers"/>.
-    /// Set to "Player" on enemy projectiles, leave empty for player projectiles.
-    /// </summary>
     public string targetTag = string.Empty;
 
     private float damage;
@@ -35,7 +30,6 @@ public sealed class Projectile : MonoBehaviour
     public AudioClip explosionSound;
     private SpriteRenderer sr;
 
-    /// <summary>Serialized default speed; readable by external spawners before Setup is called.</summary>
     public float Speed => defaultSpeed;
 
     public void AssignPool(ProjectilePooler pooler)
@@ -52,8 +46,6 @@ public sealed class Projectile : MonoBehaviour
         defaultLocalScale = transform.localScale;
         hitColliders = GetComponents<Collider2D>();
 
-        // Safety net: if this prefab is instantiated without Setup() being called,
-        // use the serialized defaultSpeed so bullets are never frozen at speed 0.
         if (speed == 0f)
         {
             speed = defaultSpeed;
@@ -104,7 +96,6 @@ public sealed class Projectile : MonoBehaviour
         gameObject.SetActive(true);
     }
 
-    /// <summary>Call after Setup() to flag this projectile as explosive with an AOE blast on hit.</summary>
     public void SetExplosive(float radius)
     {
         isExplosive = true;
